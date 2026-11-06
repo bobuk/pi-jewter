@@ -1,6 +1,6 @@
 {
   "name": "pi-jewter",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Role- and tier-aware model routing for Pi: Jev picks a role and tier per request, with a visible decision trail and opt-in selective compaction.",
   "type": "module",
   "license": "MIT",

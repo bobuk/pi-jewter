@@ -45,17 +45,23 @@ Jev transport defaults to `auto`: `TYPESAFE_API_KEY` if present, else `OPENROUTE
 
 ## Commands and visibility
 
-- `/jewter` — menu; scope switches between global and trusted-project settings.
+- `/jewter` — settings menu. Every row shows its current value; `Tab` switches between global and trusted-project settings, and leaving a submenu returns to the row you came from:
+  - **Configure in a chat with Pi** — conversational setup (see below).
+  - **Models** — one table for the default tiers and every role; inherited tiers are shown in parentheses. Pick a row to set a tier model and thinking level, or edit, rename and delete roles; `+ New role` adds one.
+  - **Subagents** — agents routed through Jewter first, each with its binding; bindings for agents without a definition are flagged.
+  - **Compaction** — on/off, fallback model and thinking.
+  - **Display** — switch notifications, footer status, routing cards, model report.
+  - **Advanced** — routing on/off, Jev transport/model/endpoint/timeout, routing and compaction thresholds.
 - `/jewter status`, `/jewter why`, `/jewter log [n]` — inspect decisions on the current branch.
 - `/jewter route <text>` — classify without switching model.
 - `/jewter on|off` — toggle globally.
 - **Configure in a chat with Pi** in the menu closes it and starts a normal assistant turn that configures Jewter conversationally: the agent reads the config, lists available models with `pi --list-models`, proposes concrete `provider/id` choices, asks before writing anything, and reminds you to `/reload`. It uses the current session model and the regular tools, so the dialog itself is visible in the transcript.
 
-The footer shows the latest decision, selected model, confidence and latency. Cards in the session transcript retain detail; expand to see probabilities. Model switches notify by default in the main session; child notifications can be enabled in Visibility. Pi records the actual physical model on each assistant message.
+The footer shows the latest decision, selected model, confidence and latency. Cards in the session transcript retain detail; expand to see probabilities. Model switches notify by default in the main session; child notifications can be enabled in **Display**. Pi records the actual physical model on each assistant message.
 
 ### Report after every request
 
-A **Models** receipt appears in the chat after the run has fully finished (including retries and automatic continuations). It is enabled by default and can be toggled in `/jewter` → **Visibility** → **Request model report** (`ui.report: false` in config). This is independent of `ui.cards`, which controls individual routing cards.
+A **Models** receipt appears in the chat after the run has fully finished (including retries and automatic continuations). It is enabled by default and can be toggled in `/jewter` → **Display** → **Model report** (`ui.report: false` in config). This is independent of `ui.cards`, which controls individual routing cards.
 
 The receipt lists the **physical model IDs reported in assistant messages**, thinking levels, applied roles, executed tools and request counts, plus a one-line `Jewter: <role>/<tier>` summary. Jev is not listed: it classifies but does not work on the request. Only Jewter's own compaction fallback LLM calls appear as a separate line. Failed and aborted attempts stay visible. Counts describe observed tool calls, not claims that edits or tests were correct. The classifier's proposed route is never substituted for actual model use. Subagents have their own session receipts; the parent reports delegation tool calls but does not guess which physical models a child used. Native Pi compaction and calls made internally by other extensions are not attributed to invented models.
 

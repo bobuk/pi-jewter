@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0]
+
+- Reorganized `/jewter` into six root entries — Configure in a chat with Pi, Models, Subagents, Compaction, Display, Advanced — with current values shown on every row.
+- Models merges default tiers and roles into one table; inherited tiers appear in parentheses.
+- `Tab` switches global/project settings; submenus stay open after each change and keep the cursor position.
+- Subagents lists bound agents first and flags bindings without an agent definition.
+
 ## [0.1.0]
 
 First public release.

@@ -27,6 +27,10 @@ export interface PickOptions {
   initial?: string;
   /** Additional lists toggled with Tab, like the built-in model selector's scope. First one opens. */
   scopes?: PickScope[];
+  /** Without scopes, Tab closes the picker and returns this value (e.g. to switch config scope). */
+  tabResult?: string;
+  /** Extra header line under the title. */
+  subtitle?: string;
 }
 
 const MAX_VISIBLE = 12;
@@ -151,11 +155,14 @@ export async function pickWithSearch(
             : undefined;
           const hint = `${visible.length}/${scope.items.length} shown · ↑↓ move · enter select · esc clear/cancel`;
           const selected = list.getSelectedItem();
+          // Spell out full model refs (`provider/id`), which the list truncates; menu keys show their label.
+          const shown = selected ? (selected.value.includes("/") ? selected.value : selected.label) : "";
           const full = selected
-            ? wrapTextWithAnsi(theme.fg("accent", `selected: ${selected.value}`) + (selected.description ? theme.fg("dim", ` · ${selected.description}`) : ""), width)
+            ? wrapTextWithAnsi(theme.fg("accent", `selected: ${shown}`) + (selected.description ? theme.fg("dim", ` · ${selected.description}`) : ""), width)
             : [];
           return [
             theme.fg("accent", title),
+            ...(options.subtitle ? [theme.fg("muted", options.subtitle)] : []),
             ...(scopeHint ? [scopeHint] : []),
             ...search.render(width),
             ...list.render(width),
@@ -164,6 +171,10 @@ export async function pickWithSearch(
           ].map(line => truncateToWidth(line, width));
         },
         handleInput(data: string): void {
+          if (scopes.length <= 1 && options.tabResult !== undefined && keybindings.matches(data, "tui.input.tab")) {
+            done(options.tabResult);
+            return;
+          }
           if (scopes.length > 1 && keybindings.matches(data, "tui.input.tab")) {
             scopeIndex = (scopeIndex + 1) % scopes.length;
             refresh();
