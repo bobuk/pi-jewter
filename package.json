@@ -1,0 +1,65 @@
+{
+  "name": "pi-jewter",
+  "version": "0.1.0",
+  "description": "Role- and tier-aware model routing for Pi: Jev picks a role and tier per request, with a visible decision trail and opt-in selective compaction.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "pi-extension",
+    "jev",
+    "model-router",
+    "model-routing",
+    "routing",
+    "compaction",
+    "openrouter",
+    "typesafe"
+  ],
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "files": [
+    "src",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test test/*.test.ts",
+    "check": "npm run typecheck && npm test"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-agent-core": "*",
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-agent-core": "^1.5.0",
+    "@earendil-works/pi-ai": "^1.5.0",
+    "@earendil-works/pi-coding-agent": "^1.5.0",
+    "@earendil-works/pi-tui": "^1.5.0",
+    "@types/node": "^22.10.2",
+    "typescript": "^5.9.3"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bobuk/pi-jewter.git"
+  },
+  "homepage": "https://github.com/bobuk/pi-jewter#readme",
+  "bugs": {
+    "url": "https://github.com/bobuk/pi-jewter/issues"
+  },
+  "author": "bobuk"
+}

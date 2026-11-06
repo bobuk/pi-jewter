@@ -1,0 +1,4 @@
+node_modules/
+plans/
+*.tgz
+.DS_Store

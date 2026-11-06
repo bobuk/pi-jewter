@@ -1,0 +1,43 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { configPaths, loadConfig, resolveTier } from "../src/config.ts";
+import { scanAgents } from "../src/subagents/catalog.ts";
+import { setAgentOverride, writeAgentOverride } from "../src/subagents/integration.ts";
+
+test("global/project/env precedence, role inheritance, untrusted project", () => {
+  const d = mkdtempSync(join(tmpdir(), "jewter-config-")); mkdirSync(join(d, ".pi"));
+  // Global config lives in Pi's agent directory (PI_CODING_AGENT_DIR), not a hardcoded home path.
+  const agentDir = mkdtempSync(join(tmpdir(), "jewter-agent-"));
+  writeFileSync(join(agentDir, "jewter.json"), JSON.stringify({tiers:{medium:{model:"openrouter/a",thinking:"high"}},roles:{planning:{tiers:{strong:{model:"openrouter/b"}}}},jev:{transport:"typesafe"}}));
+  writeFileSync(join(d,".pi/jewter.json"), JSON.stringify({tiers:{medium:{model:"openrouter/c"}},roles:{review:null}}));
+  const loaded = loadConfig({cwd:d, agentDir, env:{JEWTER_TRANSPORT:"openrouter"}, projectTrusted:true}).config;
+  assert.deepEqual(resolveTier(loaded,"planning","medium"),{model:"openrouter/c",thinking:"high"});
+  assert.equal(resolveTier(loaded,"planning","strong").model,"openrouter/b");
+  assert.equal(loaded.roles.review, undefined); assert.equal(loaded.jev.transport,"openrouter");
+  assert.equal(resolveTier(loadConfig({cwd:d, agentDir, env:{}, projectTrusted:false}).config,"planning","medium").model,"openrouter/a");
+});
+
+test("agent settings merge preserves unrelated keys and adds extension", () => {
+  const initial = { theme:"dark", subagents:{agentOverrides:{scout:{thinking:"low",subagentOnlyExtensions:["other.ts"]}}} };
+  const result = setAgentOverride(initial, "scout", "jewter/auto", "/tmp/jewter.ts");
+  assert.deepEqual(result, {theme:"dark",subagents:{agentOverrides:{scout:{thinking:"low",model:"jewter/auto",subagentOnlyExtensions:["other.ts","/tmp/jewter.ts"]}}}});
+  assert.deepEqual(setAgentOverride(initial,"scout",null),initial);
+  const d=mkdtempSync(join(tmpdir(),"jewter-settings-")); const path=join(d,"settings.json");
+  writeFileSync(path,JSON.stringify(initial)); writeAgentOverride(path,"scout","jewter/auto","/tmp/jewter.ts");
+  assert.deepEqual(JSON.parse(readFileSync(path,"utf8")),result);
+  writeFileSync(path,"not json"); assert.throws(()=>writeAgentOverride(path,"scout","jewter/auto"));
+  assert.equal(readFileSync(path,"utf8"),"not json");
+});
+
+test("agent discovery honors project precedence", () => {
+  const d=mkdtempSync(join(tmpdir(),"jewter-agents-")); const a=join(d,"a"), b=join(d,"b"); mkdirSync(a);mkdirSync(b);
+  writeFileSync(join(a,"x.md"),"---\nname: scout\n---\n");writeFileSync(join(b,"y.md"),"---\nname: scout\n---\n");
+  assert.deepEqual(scanAgents([{path:a,scope:"builtin"},{path:b,scope:"project"}]),[{name:"scout",path:join(b,"y.md"),scope:"project"}]);
+});
+
+test("configPaths resolves the global file under the given agent directory", () => {
+  assert.deepEqual(configPaths("/work/project", "/custom/agent"), { global: "/custom/agent/jewter.json", project: "/work/project/.pi/jewter.json" });
+});
