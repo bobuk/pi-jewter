@@ -4,7 +4,7 @@
 
 Role- and tier-aware model routing for [Pi](https://pi.dev), powered by [Jev](https://typesafe.ai) (TypeSafe System One).
 
-The virtual model `jewter/auto` classifies each user turn into a **role** and a **tier**, then routes the request to a physical model you configured. Roles are yours: `planning`, `implementation`, `review`, `research`, `quick` ship as defaults, each inheriting the global `fast`/`medium`/`strong` tiers and free to override them. Every decision is visible — footer status, transcript cards, a per-request model receipt — and nothing is hidden behind the router.
+The virtual model `jewter/auto` classifies each user turn into a **role** and a **tier**, then routes the request to a physical model you configured. Roles are yours: `planning`, `implementation`, `verification`, `review`, `research`, `quick` ship as defaults, each inheriting the global `fast`/`medium`/`strong` tiers and free to override them. Every decision is visible — footer status, transcript cards, a per-request model receipt — and nothing is hidden behind the router.
 
 - **Roles on top of tiers** — planning can use one model family while implementation and review use others, per tier.
 - **Jev decides, you stay in control** — low confidence, `none`, unknown roles, classifier errors and missing model credentials all keep the current model.
@@ -79,11 +79,12 @@ Global: `~/.pi/agent/jewter.json`; project: `.pi/jewter.json` only when the proj
 {
   "tiers": {
     "fast": { "model": "openrouter/deepseek/deepseek-v4.1-flash", "thinking": "low" },
-    "medium": { "model": "openrouter/openai/gpt-6.1-sol", "thinking": "high" },
-    "strong": { "model": "openrouter/anthropic/claude-opus-5.5", "thinking": "high" }
+    "medium": { "model": "openrouter/openai/gpt-6.1-sol", "thinking": "medium" },
+    "strong": { "model": "openrouter/anthropic/claude-opus-5.5", "thinking": "medium" }
   },
   "roles": {
-    "planning": { "description": "Plan and design", "tiers": { "medium": { "model": "openrouter/anthropic/claude-opus-5.5", "thinking": "high" } } }
+    "planning": { "description": "Plan and design", "tiers": { "medium": { "model": "openrouter/anthropic/claude-opus-5.5", "thinking": "medium" } } },
+    "verification": { "tiers": { "strong": { "thinking": "high" } } }
   },
   "jev": { "transport": "auto", "minConfidence": 0.6, "fastMax": 0.34, "strongMin": 0.67, "timeoutMs": 8000 },
   "ui": { "notify": "main" }
@@ -91,6 +92,26 @@ Global: `~/.pi/agent/jewter.json`; project: `.pi/jewter.json` only when the proj
 ```
 
 Pi clamps unsupported thinking levels for each physical model. Jev is probabilistic: verify actual routing in the footer/card, and use `/model` for a manual choice. Switching physical models may lose prompt-cache benefits. Failed retries and tool continuations stay on the prior physical model. Disabling Jewter keeps an existing physical model or uses a configured fallback.
+
+## Choosing tiers and thinking
+
+Tiers and thinking answer different questions. Pick the **model** for the capability the work needs, and the **thinking level** for how thorough and autonomous it should be:
+
+- **Tier = capability.** `fast` for lookups and precise mechanical edits, even across many files. `medium` for ordinary feature work and fixes. `strong` for subtle bugs, unfamiliar domains, architecture and ambiguous goals, and for short requests with high stakes such as deploy, secure or migrate. Jev's complexity question is phrased this way: prompt length and file count are not difficulty.
+- **Thinking = thoroughness.** Keep the model's default (`medium`) for everyday work. Use `low` for quick, in-the-loop iteration such as sketches and small edits. Use `high` where verification and edge cases matter: tests, reproducing bugs, review, security. Reserve `max` for long autonomous runs you will not supervise.
+- **Strong coordinator, cheaper workers.** A capable model on `medium` can lead a task while subagents bound to `implementation` or `quick` do bounded pieces on cheaper tiers. Spend `high` on checking.
+
+The shipped `verification` role makes this concrete: it inherits the tier models and only raises thinking (`fast` medium, `medium` and `strong` high). Implement on `implementation`, then ask to verify; Jev routes the check to `verification`.
+
+When a result is wrong, first check the context: the prompt, tools and skills. If the model skipped a file, did not run the tests or stopped early, raise **thinking**. If it had the context, clearly tried and was still confidently wrong, use a stronger **model**.
+
+### Profiles
+
+[`examples/jewter.price.json`](examples/jewter.price.json) and [`examples/jewter.quality.json`](examples/jewter.quality.json) share the layout above and differ only in the expert model. The price profile uses DeepSeek; the quality profile uses Claude Opus. Both use `luna`, `sol` and `terra` via the `openai-codex` login for routine slots. The expert model fills the `strong` tier, the `medium` and `strong` tiers of `planning` and `review`, and the `strong` tier of `verification`. Copy one to `~/.pi/agent/jewter.json`, adjust the model ids to what `pi --list-models` shows, and `/reload`.
+
+### Checking the classifier on your prompts
+
+`npm run eval:jev` classifies the labelled prompts in `test/fixtures/jev-live-eval.json` through your configured Jev transport. It compares the current questions with the previous size-based complexity question, using your roles and thresholds. It makes real, possibly paid, calls and is not part of `npm test`; Jev answers vary between runs, so compare several runs before tuning thresholds. Add your own prompts to the fixture to check a configuration against the work you actually do.
 
 ## Selective compaction (opt-in)
 

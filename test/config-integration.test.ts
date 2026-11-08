@@ -63,3 +63,24 @@ test("a removed verification role stays removed", () => {
   writeFileSync(join(agentDir, "jewter.json"), JSON.stringify({ roles: { verification: null } }));
   assert.equal(loadConfig({ cwd: d, agentDir, env: {}, projectTrusted: false }).config.roles.verification, undefined);
 });
+
+test("shipped profiles load cleanly and differ only in the expert model", () => {
+  const read = (name: string) => readFileSync(new URL(`../examples/jewter.${name}.json`, import.meta.url), "utf8");
+  for (const name of ["price", "quality"]) {
+    const d = mkdtempSync(join(tmpdir(), "jewter-profile-"));
+    const agentDir = mkdtempSync(join(tmpdir(), "jewter-agent-"));
+    writeFileSync(join(agentDir, "jewter.json"), read(name));
+    const loaded = loadConfig({ cwd: d, agentDir, env: {}, projectTrusted: false });
+    assert.deepEqual(loaded.warnings, [], name);
+    const c = loaded.config;
+    assert.equal(c.tiers.medium.thinking, "medium", name);
+    assert.equal(c.tiers.strong.thinking, "medium", name);
+    assert.equal(resolveTier(c, "verification", "strong").thinking, "high", name);
+    assert.equal(resolveTier(c, "verification", "strong").model, c.tiers.strong.model, name);
+    assert.equal(resolveTier(c, "review", "medium").model, c.tiers.strong.model, name);
+  }
+  const price = read("price").replaceAll("openrouter/deepseek/deepseek-v4.1-flash", "EXPERT");
+  const quality = read("quality").replaceAll("claude-bridge/claude-opus-5-5", "EXPERT");
+  // Planning sketches on the fast tier are the one intended difference: luna for price, the expert for quality.
+  assert.equal(price.replace(/("fast": \{\s*"model": )"openai-codex\/gpt-6-luna"(,\s*"thinking": "low"\s*\},\s*"medium": \{\s*"model": "EXPERT")/, "$1\"EXPERT\"$2"), quality);
+});

@@ -27,6 +27,7 @@
   },
   "files": [
     "src",
+    "examples",
     "README.md",
     "CHANGELOG.md"
   ],

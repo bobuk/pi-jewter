@@ -1,0 +1,80 @@
+{
+  "tiers": {
+    "fast": {
+      "model": "openai-codex/gpt-6-luna",
+      "thinking": "low"
+    },
+    "medium": {
+      "model": "openai-codex/gpt-6.1-sol",
+      "thinking": "medium"
+    },
+    "strong": {
+      "model": "claude-bridge/claude-opus-5-5",
+      "thinking": "medium"
+    }
+  },
+  "roles": {
+    "planning": {
+      "tiers": {
+        "fast": {
+          "model": "claude-bridge/claude-opus-5-5",
+          "thinking": "low"
+        },
+        "medium": {
+          "model": "claude-bridge/claude-opus-5-5",
+          "thinking": "medium"
+        },
+        "strong": {
+          "model": "claude-bridge/claude-opus-5-5",
+          "thinking": "high"
+        }
+      }
+    },
+    "implementation": {
+      "description": "Writing, changing, or fixing code toward a known goal; quick build-and-iterate loops"
+    },
+    "verification": {
+      "description": "Checking that existing work is correct: running or writing tests, reproducing bugs, probing edge cases, validating a fix before it ships",
+      "tiers": {
+        "fast": {
+          "model": "openai-codex/gpt-6-luna",
+          "thinking": "medium"
+        },
+        "medium": {
+          "model": "openai-codex/gpt-6.1-sol",
+          "thinking": "high"
+        },
+        "strong": {
+          "model": "claude-bridge/claude-opus-5-5",
+          "thinking": "high"
+        }
+      }
+    },
+    "review": {
+      "tiers": {
+        "fast": {
+          "model": "openai-codex/gpt-6.1-terra",
+          "thinking": "medium"
+        },
+        "medium": {
+          "model": "claude-bridge/claude-opus-5-5",
+          "thinking": "high"
+        },
+        "strong": {
+          "model": "claude-bridge/claude-opus-5-5",
+          "thinking": "high"
+        }
+      }
+    }
+  },
+  "jev": {
+    "transport": "openrouter"
+  },
+  "ui": {
+    "notify": "main"
+  },
+  "compaction": {
+    "enabled": true,
+    "model": "openai-codex/gpt-6-luna"
+  }
+}

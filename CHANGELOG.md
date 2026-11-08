@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+- Jev's complexity question now rates the capability a request needs (knowledge, judgement, risk) instead of prompt length or file count: large mechanical edits are trivial, short high-stakes requests such as deploy or harden are complex.
+- New default role `verification` for tests, reproductions, edge cases and validating fixes. It keeps the tier models and raises thinking; `implementation` no longer covers verification.
+- `/jewter` Models shows thinking-only role overrides, such as `(sol):high`.
+- `examples/jewter.price.json` and `examples/jewter.quality.json` profiles, and a README guide to choosing tiers and thinking.
+- `npm run eval:jev` compares classifier questions on labelled prompts through the live Jev transport (opt-in, paid calls).
+
 ## [0.2.0]
 
 - Reorganized `/jewter` into six root entries — Configure in a chat with Pi, Models, Subagents, Compaction, Display, Advanced — with current values shown on every row.
