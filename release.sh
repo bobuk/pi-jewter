@@ -8,7 +8,8 @@
 #   4. publishes to npm (dist-tag `next` for pre-releases such as 1.2.3-rc.1);
 #   5. pushes main and the tag to origin.
 # Publishing happens before pushing, so a failed publish leaves no remote tag.
-# --dry-run runs all checks and `npm publish --dry-run` without changing anything.
+# --dry-run runs all checks, applies the changelog and version changes temporarily,
+# runs `npm publish --dry-run`, and restores the files; nothing is committed or published.
 set -euo pipefail
 
 NPM="${NPM:-npm}"
@@ -54,18 +55,26 @@ step "Running checks"
 "$NPM" run check
 "$NPM" pack --dry-run
 
+release_files=(CHANGELOG.md package.json package-lock.json)
+apply_version() {
+  release_ts changelog "$version"
+  "$NPM" version "$version" --no-git-tag-version --allow-same-version >/dev/null
+}
+
 if (( dry_run )); then
-  step "Dry run: npm publish --dry-run"
+  step "Dry run: npm publish --dry-run for $version"
+  trap 'git checkout --quiet -- "${release_files[@]}"' EXIT
+  apply_version
+  sed -n "/^## \[$version\]/,/^## \[/p" CHANGELOG.md | sed '$d'
   "$NPM" publish --dry-run --access public --tag "$dist_tag"
   echo
-  echo "Dry run passed. Nothing was changed, committed, tagged, published or pushed."
+  echo "Dry run passed. Files restored; nothing was committed, tagged, published or pushed."
   exit 0
 fi
 
 step "Creating release commit and tag $tag"
-release_ts changelog "$version"
-"$NPM" version "$version" --no-git-tag-version >/dev/null
-git add CHANGELOG.md package.json package-lock.json
+apply_version
+git add "${release_files[@]}"
 git commit --quiet -m "chore(release): $version"
 git tag -a "$tag" -m "pi-jewter $version"
 echo "Committed $(git rev-parse --short HEAD) and tagged $tag (not pushed yet)"

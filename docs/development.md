@@ -139,7 +139,7 @@ Documentation should distinguish intended policy, observed facts, heuristics and
 Every release is a Git tag `vX.Y.Z` that matches `package.json`, plus the same version on npm. Both come from one command, run by a maintainer who is logged in to npm:
 
 ```sh
-./release.sh X.Y.Z --dry-run   # all checks and `npm publish --dry-run`; changes nothing
+./release.sh X.Y.Z --dry-run   # all checks, preview of the changelog section, `npm publish --dry-run`; files restored
 ./release.sh X.Y.Z             # commit, tag, publish to npm, push
 ```
 
@@ -172,7 +172,7 @@ Pre-releases such as `X.Y.Z-rc.1` are published under the npm dist-tag `next`, s
 - **`npm publish` fails** (2FA, network, permissions): the commit and tag exist only locally; nothing was pushed. The script prints both options: retry `npm publish --access public --tag <dist-tag> && git push --atomic origin main vX.Y.Z`, or undo with `git tag -d vX.Y.Z && git reset --hard HEAD~1`.
 - **The push fails after publishing:** the version is on npm, but the commit and tag are local. Run `git push --atomic origin main vX.Y.Z`. Atomic push sends both or neither, so `origin` never gets a tag without its commit.
 
-npm versions cannot be republished, and unpublishing is restricted. Use `--dry-run` first when in doubt.
+npm versions cannot be republished, and unpublishing is restricted. Use `--dry-run` first: it applies the changelog and version changes temporarily, shows the resulting changelog section and the exact tarball, and restores the files even if a step fails.
 
 ### After a release
 
