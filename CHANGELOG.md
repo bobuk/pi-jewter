@@ -6,6 +6,8 @@
 - New default role `verification` for tests, reproductions, edge cases and validating fixes. It keeps the tier models and raises thinking; `implementation` no longer covers verification.
 - `/jewter` Models shows thinking-only role overrides, such as `(sol):high`.
 - `examples/jewter.price.json` and `examples/jewter.quality.json` profiles, and a README guide to choosing tiers and thinking.
+- Verification hints: after a run that changed files, Jev decides whether a separate verification pass is worth suggesting. Only a confident `suggest` places a ready prompt in an empty editor; nothing is sent automatically. `/jewter verify` re-inserts it; toggle in **Display**, threshold in **Advanced** (`verify.minConfidence`, default 0.8). `npm run eval:verify` checks the decision on labelled runs.
+- README: prefer a different model family for review and verification than for implementation, and route spec interviews to `planning`.
 - `npm run eval:jev` compares classifier questions on labelled prompts through the live Jev transport (opt-in, paid calls).
 
 ## [0.2.0]

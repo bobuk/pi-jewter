@@ -20,9 +20,10 @@ export function setupDialogPrompt(cwd: string): string {
     "- subagents.agents.<agent> = \"auto\" | \"off\" | \"<role>\"",
     "- jev = { transport: \"auto|typesafe|openrouter\", model, baseUrl, minConfidence, fastMax, strongMin, tierMajority, timeoutMs }",
     "- ui = { notify: \"main|all|off\", footer, cards, report }",
+    "- verify = { enabled, minConfidence } (Jev-gated hint to verify a run that changed files; never sent automatically)",
     "",
     "Ask me what to configure: which roles I need (shipped defaults are planning, implementation, verification, review, research, quick), which models to assign to the tiers and roles, whether to enable compaction, and which agents should route through Jewter. Propose concrete provider/id values from the available models and briefly justify the choice. Account for my subscriptions (openai-codex, Claude) and my OpenRouter key.",
-    "Guidance: tiers express capability, thinking expresses thoroughness. Keep everyday tiers on medium thinking; use low for quick in-the-loop work, high for verification and review, max only for long unsupervised runs. Put the most capable model on strong and on the planning and review tiers that need judgement, not on routine work. Profiles to start from: examples/jewter.price.json and examples/jewter.quality.json in the pi-jewter package.",
+    "Guidance: tiers express capability, thinking expresses thoroughness. Keep everyday tiers on medium thinking; use low for quick in-the-loop work, high for verification and review, max only for long unsupervised runs. Put the most capable model on strong and on the planning and review tiers that need judgement, not on routine work. Prefer a different model family for review and verification than for implementation. Profiles to start from: examples/jewter.price.json and examples/jewter.quality.json in the pi-jewter package.",
     "After I confirm, update the config (valid JSON, keep the other fields) and remind me to run /reload.",
   ].join("\n");
 }

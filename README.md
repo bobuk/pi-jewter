@@ -54,6 +54,7 @@ Jev transport defaults to `auto`: `TYPESAFE_API_KEY` if present, else `OPENROUTE
   - **Advanced** — routing on/off, Jev transport/model/endpoint/timeout, routing and compaction thresholds.
 - `/jewter status`, `/jewter why`, `/jewter log [n]` — inspect decisions on the current branch.
 - `/jewter route <text>` — classify without switching model.
+- `/jewter verify` — put the last verification suggestion into the editor.
 - `/jewter on|off` — toggle globally.
 - **Configure in a chat with Pi** in the menu closes it and starts a normal assistant turn that configures Jewter conversationally: the agent reads the config, lists available models with `pi --list-models`, proposes concrete `provider/id` choices, asks before writing anything, and reminds you to `/reload`. It uses the current session model and the regular tools, so the dialog itself is visible in the transcript.
 
@@ -99,11 +100,17 @@ Tiers and thinking answer different questions. Pick the **model** for the capabi
 
 - **Tier = capability.** `fast` for lookups and precise mechanical edits, even across many files. `medium` for ordinary feature work and fixes. `strong` for subtle bugs, unfamiliar domains, architecture and ambiguous goals, and for short requests with high stakes such as deploy, secure or migrate. Jev's complexity question is phrased this way: prompt length and file count are not difficulty.
 - **Thinking = thoroughness.** Keep the model's default (`medium`) for everyday work. Use `low` for quick, in-the-loop iteration such as sketches and small edits. Use `high` where verification and edge cases matter: tests, reproducing bugs, review, security. Reserve `max` for long autonomous runs you will not supervise.
+- **Critic from another model family.** Let `review` and `verification` use a different family than `implementation`, so the check does not share the author's blind spots. Agreement between models is not proof; tests and real signals are.
+- **Spec before code.** "Interview me about the requirements" and "write acceptance criteria first" route to `planning`; on the `fast` tier a capable model with `low` thinking is a cheap way to get an expert's questions.
 - **Strong coordinator, cheaper workers.** A capable model on `medium` can lead a task while subagents bound to `implementation` or `quick` do bounded pieces on cheaper tiers. Spend `high` on checking.
 
 The shipped `verification` role makes this concrete: it inherits the tier models and only raises thinking (`fast` medium, `medium` and `strong` high). Implement on `implementation`, then ask to verify; Jev routes the check to `verification`.
 
 When a result is wrong, first check the context: the prompt, tools and skills. If the model skipped a file, did not run the tests or stopped early, raise **thinking**. If it had the context, clearly tried and was still confidently wrong, use a stronger **model**.
+
+### Verification hints
+
+After a main-session run that changed files outside `verification`, Jewter asks Jev whether a separate verification pass is worth it. Jev sees the request, the changed paths, the shell commands run afterwards with their outcome, and the final reply. A build or typecheck alone does not count as a check. Only a confident `suggest` (`verify.minConfidence`, default 0.8) shows a hint. The hint places a ready prompt such as "Verify the changes from the previous answer (retry.ts): …" in the editor if it is empty, in the language of your request. It is **never sent automatically**. If you were already typing, the hint stays in the transcript and `/jewter verify` inserts it later. Sending the prompt routes it to `verification`. Uncertain answers, `skip`, Jev errors, aborted runs, subagents and non-interactive modes stay silent. Each check is one extra Jev call. Turn it off in `/jewter` → **Display** → **Verification hints** (`"verify": { "enabled": false }`). `npm run eval:verify` checks the decision on labelled runs in `test/fixtures/jev-verify-eval.json`.
 
 ### Profiles
 
