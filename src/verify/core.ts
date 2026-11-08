@@ -10,6 +10,12 @@ export interface RunFacts {
   role?: string;
   /** Paths passed to file-changing tools, in first-seen order. */
   changedFiles: string[];
+  /** Paths/files/directories mentioned by other tools likely to change repository state. */
+  indirectChanges: string[];
+  /** Count of state-changing non-edit tools (shell, patch, custom tools). */
+  indirectEdits: number;
+  /** Real test executions observed in shell commands, including exit status. */
+  tests: { command: string; ok: boolean }[];
   /** Number of file-changing tool calls, including those without a readable path. */
   edits: number;
   /** Shell commands with their outcome, in order. */
@@ -27,9 +33,25 @@ export interface VerifyGate {
   hasUI: boolean;
 }
 
-/** File-changing tools: Pi's edit/write plus common multi-edit variants. */
+/** Pi file editors and common patch tools; shell and custom tools are handled separately. */
 export function isChangeTool(name: string): boolean {
   return /^(edit|write|multi_?edit|apply_?patch|str_replace\w*)$/i.test(name);
+}
+
+/** Conservative recognizer for commands whose successful completion proves tests ran. */
+export function isTestCommand(command: string): boolean {
+  return /(?:^|[;&|]\s*|\b)(?:npm\s+(?:run\s+)?(?:test|check|vitest|jest|mocha|playwright|cypress)|pnpm\s+(?:run\s+)?(?:test|check|vitest|jest|mocha|playwright|cypress)|yarn\s+(?:test|check|vitest|jest|mocha|playwright|cypress)|bun\s+(?:run\s+)?(?:test|check)|node\s+--test|pytest\b|uv\s+run\s+pytest\b|cargo\s+test\b|go\s+test\b|dotnet\s+test\b|swift\s+test\b|mix\s+test\b|rspec\b|phpunit\b|\b(?:vitest|jest|mocha|playwright|cypress)\b)/i.test(command);
+}
+
+/** Commands that may alter tracked or generated repository content. */
+export function isPotentiallyMutatingCommand(command: string): boolean {
+  return /(?:^|[;&|]\s*|\b)(?:git\s+(?:apply|checkout|reset|restore|clean|rebase|cherry-pick)|patch\b|sed\s+-i\b|perl\s+-i\b|tee\s+|(?:npm|pnpm|yarn|bun)\s+(?:version|pkg\s+set)|(?:npx|pnpm\s+dlx|bunx)\s+(?:patch-package|prettier|eslint|biome|prisma|drizzle-kit)|(?:cargo|go|swift|protoc)\s+(?:fmt|generate)|make\s+(?:generate|format|fmt)|\w*(?:codegen|generate|scaffold|format|fmt|fix|migrate)\w*\s)/i.test(command);
+}
+
+/** Directory-changing/custom tools that are not Pi edit/write calls. */
+export function isPotentiallyMutatingTool(name: string): boolean {
+  return /^(?:bash|shell|powershell|terminal|filesystem_write|file_write|write_file|edit_file|apply_patch|patch|apply_diff|search_replace|str_replace|multi_edit)$/i.test(name)
+    || /(?:write|edit|patch|apply.?diff|replace|generate|scaffold|migrate|format|fix)/i.test(name);
 }
 
 export function isShellTool(name: string): boolean {
@@ -39,7 +61,7 @@ export function isShellTool(name: string): boolean {
 /** Only ask Jev after a finished, interactive main-session run that changed files outside verification. */
 export function shouldAsk(facts: RunFacts, gate: VerifyGate): boolean {
   return gate.enabled && gate.routingEnabled && gate.hasUI && !gate.child && !facts.aborted
-    && facts.edits > 0 && facts.role !== "verification" && facts.prompt.trim() !== "";
+    && (facts.edits + facts.indirectEdits) > 0 && facts.role !== "verification" && facts.prompt.trim() !== "";
 }
 
 export function buildVerifyQuestions(): JevQuestions {
@@ -48,13 +70,15 @@ export function buildVerifyQuestions(): JevQuestions {
       type: "choice",
       instructions:
         "A coding agent just finished the request in `request` and changed the files in `changed_files`. " +
-        "`commands` lists the shell commands it ran afterwards and whether each succeeded; `final_message` is its last reply. " +
+        "`commands` lists shell commands and their outcomes; `tests` lists recognized test executions and their outcomes; " +
+        "`indirect_changes` lists files changed via shell, patch or other non-editor tools. `final_message` is its last reply. " +
         "Decide whether the user should now ask for a separate verification pass. " +
         "Choose `suggest` only when the change carries risk that was not adequately checked. " +
         "Choose `skip` when the change is trivial, or when relevant tests or checks already ran and passed. " +
-        "A build, lint, or typecheck alone does not check behavior.",
+        "A build, lint, or typecheck alone does not check behavior. Count a test as adequate only if it is relevant to the changed behavior and it passed; test command recognition is evidence it ran, not proof its assertions cover the fix. " +
+        "When evidence is unclear, lean toward suggesting verification for risky changes, but skip mechanical edits.",
       criteria: {
-        suggest: "Behavior changed or a bug was fixed with edge cases, concurrency, security, data handling, or public interfaces involved, and no test or reproduction of that behavior succeeded afterwards (a build or typecheck alone does not count)",
+        suggest: "Behavior changed or a bug was fixed with edge cases, concurrency, security, data handling, or public interfaces involved, and no relevant test or reproduction of that behavior passed afterwards (a build or typecheck alone does not count)",
         skip: "Docs, comments, text, formatting, renames, or other mechanical edits; or relevant tests or checks ran and passed after the change",
       },
     },
@@ -67,8 +91,11 @@ const clip = (text: string, max: number) => text.length > max ? `${text.slice(0,
 export function buildVerifyState(facts: RunFacts): Record<string, unknown> {
   return {
     request: clip(facts.prompt, 4000),
-    changed_files: facts.changedFiles.slice(0, 30),
+    changed_files: [...new Set([...facts.changedFiles, ...facts.indirectChanges])].slice(0, 40),
+    indirect_changes: facts.indirectChanges.slice(0, 20),
     edit_calls: facts.edits,
+    indirect_edit_calls: facts.indirectEdits,
+    tests: facts.tests.slice(-12).map(c => `${c.ok ? "passed" : "failed"}: ${c.command.slice(0, 200)}`),
     commands: facts.commands.slice(-12).map(c => `${c.ok ? "ok" : "failed"}: ${c.command.slice(0, 200)}`),
     tool_errors: facts.toolErrors,
     final_message: clip(facts.finalText, 1500),

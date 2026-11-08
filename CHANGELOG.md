@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Verification hints now distinguish recognized test runs from build/typecheck commands and account for successful shell patch/generator commands and third-party patch/write tools when their effects are observable.
 - Jev's complexity question now rates the capability a request needs (knowledge, judgement, risk) instead of prompt length or file count: large mechanical edits are trivial, short high-stakes requests such as deploy or harden are complex.
 - New default role `verification` for tests, reproductions, edge cases and validating fixes. It keeps the tier models and raises thinking; `implementation` no longer covers verification.
 - `/jewter` Models shows thinking-only role overrides, such as `(sol):high`.

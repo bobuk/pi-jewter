@@ -11,7 +11,7 @@ import { loadConfig } from "../src/config.ts";
 import { JevClient, resolveTransport } from "../src/jev/client.ts";
 import { buildVerifyQuestions, buildVerifyState, decideVerify, type RunFacts } from "../src/verify/core.ts";
 
-interface Case { name: string; expect: ("suggest" | "skip")[]; prompt: string; changedFiles: string[]; commands: { command: string; ok: boolean }[]; finalText: string }
+interface Case { name: string; expect: ("suggest" | "skip")[]; prompt: string; changedFiles: string[]; commands: { command: string; ok: boolean }[]; tests?: { command: string; ok: boolean }[]; indirectChanges?: string[]; indirectEdits?: number; finalText: string }
 const fixture = JSON.parse(readFileSync(new URL("../test/fixtures/jev-verify-eval.json", import.meta.url), "utf8")) as { cases: Case[] };
 const config = loadConfig({ cwd: process.cwd() }).config;
 const resolved = resolveTransport(config.jev, process.env);
@@ -19,7 +19,7 @@ if (!resolved.ok) { console.error(resolved.error); process.exit(1); }
 const client = new JevClient({ transport: resolved.transport, timeoutMs: Math.max(config.jev.timeoutMs, 20_000) });
 
 const results = await Promise.all(fixture.cases.map(async c => {
-  const facts: RunFacts = { prompt: c.prompt, changedFiles: c.changedFiles, edits: c.changedFiles.length, commands: c.commands, toolErrors: 0, finalText: c.finalText, aborted: false };
+  const facts: RunFacts = { prompt: c.prompt, changedFiles: c.changedFiles, indirectChanges: c.indirectChanges ?? [], indirectEdits: c.indirectEdits ?? 0, edits: c.changedFiles.length, commands: c.commands, tests: c.tests ?? [], toolErrors: 0, finalText: c.finalText, aborted: false };
   try {
     const d = decideVerify(await client.ask(buildVerifyState(facts), buildVerifyQuestions()), config.verify.minConfidence);
     return { c, outcome: d.suggest ? "suggest" as const : "skip" as const, d };
