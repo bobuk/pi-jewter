@@ -28,6 +28,7 @@
   "files": [
     "src",
     "examples",
+    "docs",
     "README.md",
     "CHANGELOG.md"
   ],
