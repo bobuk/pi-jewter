@@ -7,6 +7,7 @@ import { showStatus } from "./ui/status.ts";
 import type { RoutingRecord } from "./router/state.ts";
 import { registerCompaction } from "./compaction/extension.ts";
 import { registerReport } from "./report/extension.ts";
+import { registerVerify } from "./verify/extension.ts";
 
 export default function (pi: ExtensionAPI): void {
   let context: ExtensionContext | undefined;
@@ -14,11 +15,13 @@ export default function (pi: ExtensionAPI): void {
   registerRenderer(pi);
   const report = registerReport(pi, getConfig);
   registerCompaction(pi, getConfig, call => report.service(call));
+  const verify = registerVerify(pi, getConfig);
   const register = registerRouters(pi, {
     getContext: () => context,
     getConfig,
     observe: (record, ctx) => {
       report.route(record);
+      verify.route(record);
       recordDecision(pi, ctx, getConfig(ctx), record);
     },
   });

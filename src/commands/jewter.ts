@@ -7,6 +7,7 @@ import { menu, patchFile } from "../ui/menu.ts";
 import { setupDialogPrompt } from "./dialog.ts";
 import { statusText } from "../ui/status.ts";
 import type { RoutingRecord } from "../router/state.ts";
+import { VERIFY_ENTRY, type VerifyEntry } from "../verify/extension.ts";
 
 export function registerCommands(pi: ExtensionAPI, refresh: (ctx: ExtensionCommandContext) => void): void {
   pi.registerCommand("jewter", { description: "Configure and inspect Jev model routing", handler: async (args, ctx) => {
@@ -29,6 +30,11 @@ export function registerCommands(pi: ExtensionAPI, refresh: (ctx: ExtensionComma
       const selected = all.slice(-count);
       ctx.ui.notify(selected.length ? selected.map(r => command === "status" ? statusText(r) : JSON.stringify(r, null, 2)).join("\n") : "Jewter: no decisions on this branch", "info"); return;
     }
+    if (command === "verify") {
+      const last = ctx.sessionManager.getBranch().filter(e => e.type === "custom" && e.customType === VERIFY_ENTRY).at(-1);
+      if (!last || last.type !== "custom") { ctx.ui.notify("Jewter: no verification suggestion on this branch", "info"); return; }
+      ctx.ui.setEditorText((last.data as VerifyEntry).prompt); return;
+    }
     if (command === "route") {
       const prompt = rest.join(" ");
       if (!prompt) { ctx.ui.notify("Usage: /jewter route <text>", "warning"); return; }
@@ -40,6 +46,6 @@ export function registerCommands(pi: ExtensionAPI, refresh: (ctx: ExtensionComma
       } catch (e) { ctx.ui.notify(`Jewter: ${e instanceof Error ? e.message : String(e)}`, "error"); }
       return;
     }
-    ctx.ui.notify("Usage: /jewter [menu|status|why|log [n]|route <text>|on|off]", "warning");
+    ctx.ui.notify("Usage: /jewter [menu|status|why|log [n]|route <text>|verify|on|off]", "warning");
   } });
 }

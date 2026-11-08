@@ -96,8 +96,16 @@ export interface CompactionConfig {
   timeoutMs: number;
 }
 
+/** Jev-gated hint to verify a run that changed files. */
+export interface VerifyConfig {
+  enabled: boolean;
+  /** Minimum Jev confidence in `suggest` before the hint appears. */
+  minConfidence: number;
+}
+
 export interface JewterConfig {
   enabled: boolean;
+  verify: VerifyConfig;
   compaction: CompactionConfig;
   tiers: Record<TierName, TierConfig>;
   roles: Record<string, RoleConfig>;
@@ -163,6 +171,7 @@ export function configPaths(cwd: string, agentDir: string = getAgentDir()): Conf
 export function defaultConfig(): JewterConfig {
   return {
     enabled: true,
+    verify: { enabled: true, minConfidence: 0.8 },
     compaction: { enabled: false, thinking: "off", minConfidence: 0.8, minReduction: 0.15, minResultChars: 1200, retainedChars: 400, maxCandidates: 40, maxSummaryChars: 60000, timeoutMs: 15000 },
     tiers: {
       fast: { thinking: "auto" },
@@ -301,6 +310,11 @@ export function normalizeConfig(raw: unknown, base: JewterConfig = defaultConfig
     config.compaction.maxCandidates = Math.round(clampNumber(asNumber(c.maxCandidates, config.compaction.maxCandidates), 1, 100));
     config.compaction.maxSummaryChars = Math.round(clampNumber(asNumber(c.maxSummaryChars, config.compaction.maxSummaryChars), 4000, 1000000));
     config.compaction.timeoutMs = Math.round(clampNumber(asNumber(c.timeoutMs, config.compaction.timeoutMs), 500, 120000));
+  }
+
+  if (isPlainObject(raw.verify)) {
+    config.verify.enabled = asBoolean(raw.verify.enabled, config.verify.enabled);
+    config.verify.minConfidence = clampNumber(asNumber(raw.verify.minConfidence, config.verify.minConfidence), 0.5, 1);
   }
 
   if (isPlainObject(raw.tiers)) {

@@ -46,7 +46,7 @@ test("compaction, display and advanced rows show current values", () => {
   assert.equal(compactionSummary(c), "on · gpt-6-luna");
   c.compaction.model = "anthropic/claude-haiku-5-5";
   assert.equal(compactionSummary(c), "on · claude-haiku-5-5");
-  assert.equal(displaySummary(c), "notify main · report on");
+  assert.equal(displaySummary(c), "notify main · report on · verify on");
   assert.equal(advancedSummary(c), "Jev auto · confidence 0.6");
   c.enabled = false;
   assert.equal(advancedSummary(c), "routing off · Jev auto · confidence 0.6");

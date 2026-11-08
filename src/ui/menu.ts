@@ -204,6 +204,7 @@ export async function menu(ctx: ExtensionCommandContext, refresh: () => void, on
       { value: "footer", label: "Footer status", description: onOff(c.ui.footer) },
       { value: "cards", label: "Routing cards", description: onOff(c.ui.cards) },
       { value: "report", label: "Model report", description: onOff(c.ui.report) },
+      { value: "verify", label: "Verification hints", description: onOff(c.verify.enabled) },
     ];
   }, async choice => {
     const c = config();
@@ -214,6 +215,8 @@ export async function menu(ctx: ExtensionCommandContext, refresh: () => void, on
       if (notify) save(d => { d.ui ??= {}; d.ui.notify = notify; });
     } else if (choice === "footer" || choice === "cards" || choice === "report") {
       save(d => { d.ui ??= {}; d.ui[choice] = !c.ui[choice]; });
+    } else if (choice === "verify") {
+      save(d => { d.verify ??= {}; d.verify.enabled = !c.verify.enabled; });
     }
   });
 
@@ -238,6 +241,7 @@ export async function menu(ctx: ExtensionCommandContext, refresh: () => void, on
       { value: "fastMax", label: "Fast threshold", description: String(c.jev.fastMax) },
       { value: "strongMin", label: "Strong threshold", description: String(c.jev.strongMin) },
       { value: "tierMajority", label: "Tier majority", description: String(c.jev.tierMajority) },
+      { value: "verify.minConfidence", label: "Verification hint confidence", description: String(c.verify.minConfidence) },
       { value: "compaction.minConfidence", label: "Compaction Jev confidence", description: String(c.compaction.minConfidence) },
       { value: "compaction.minReduction", label: "Compaction min reduction", description: String(c.compaction.minReduction) },
     ];
@@ -254,6 +258,11 @@ export async function menu(ctx: ExtensionCommandContext, refresh: () => void, on
       if (value === undefined) return;
       if (choice === "baseUrl" && value.trim() && !/^https?:\/\//.test(value.trim())) throw new Error("Endpoint must start with http:// or https://");
       save(d => { d.jev ??= {}; if (value.trim()) d.jev[choice] = value.trim(); else delete d.jev[choice]; });
+      return;
+    }
+    if (choice === "verify.minConfidence") {
+      const n = await numberField("Verification hint confidence", c.verify.minConfidence, 0.5, 1);
+      if (n !== undefined) save(d => { d.verify ??= {}; if (n === null) delete d.verify.minConfidence; else d.verify.minConfidence = n; });
       return;
     }
     if (choice.startsWith("compaction.")) {

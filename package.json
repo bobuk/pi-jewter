@@ -35,7 +35,8 @@
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test test/*.test.ts",
     "check": "npm run typecheck && npm test",
-    "eval:jev": "node --experimental-strip-types scripts/jev-eval.ts"
+    "eval:jev": "node --experimental-strip-types scripts/jev-eval.ts",
+    "eval:verify": "node --experimental-strip-types scripts/jev-verify-eval.ts"
   },
   "peerDependencies": {
     "@earendil-works/pi-agent-core": "*",

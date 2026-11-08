@@ -35,7 +35,7 @@ export function compactionSummary(config: JewterConfig): string {
 }
 
 export function displaySummary(config: JewterConfig): string {
-  return `notify ${config.ui.notify} · report ${config.ui.report ? "on" : "off"}`;
+  return `notify ${config.ui.notify} · report ${config.ui.report ? "on" : "off"} · verify ${config.verify.enabled ? "on" : "off"}`;
 }
 
 export function advancedSummary(config: JewterConfig): string {
