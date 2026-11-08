@@ -33,7 +33,7 @@ pi install npm:pi-jewter
 pi install git:github.com/bobuk/pi-jewter
 ```
 
-Releases are Git tags `vX.Y.Z`; each GitHub Release is published to npm automatically. If [npm](https://www.npmjs.com/package/pi-jewter) does not list the package yet, install from Git. Run `/reload` if Pi is already open. Do not load the npm, Git and local copies together.
+Releases are Git tags `vX.Y.Z` with the same version on npm. If [npm](https://www.npmjs.com/package/pi-jewter) does not list the package yet, install from Git. Run `/reload` if Pi is already open. Do not load the npm, Git and local copies together.
 
 ### 2. Provide a Jev credential
 

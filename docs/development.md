@@ -136,69 +136,53 @@ Documentation should distinguish intended policy, observed facts, heuristics and
 
 ## Releasing
 
-Every release is a Git tag `vX.Y.Z` that matches `package.json`. Publishing a **GitHub Release** for that tag runs [`.github/workflows/release.yml`](../.github/workflows/release.yml), which publishes the package to npm. Pushing a tag alone publishes nothing.
+Every release is a Git tag `vX.Y.Z` that matches `package.json`, plus the same version on npm. Both come from one command, run by a maintainer who is logged in to npm:
+
+```sh
+./release.sh X.Y.Z --dry-run   # all checks and `npm publish --dry-run`; changes nothing
+./release.sh X.Y.Z             # commit, tag, publish to npm, push
+```
 
 `pi update git:github.com/bobuk/pi-jewter` fetches Git commits; it does not publish a release. `pi update npm:pi-jewter` retrieves the npm `latest` version, not unreleased commits.
 
-### Cutting a release
+### Before running it
 
-1. On an up-to-date `main` with a clean tree, run `npm run check` and `npm pack --dry-run`.
-2. In `CHANGELOG.md`, rename `## [Unreleased]` to `## [X.Y.Z]` and add a fresh empty `## [Unreleased]` above it.
-3. Bump the version, commit and tag in one step:
+1. Describe the release under `## [Unreleased]` in `CHANGELOG.md`, commit and push. The script refuses an empty Unreleased section.
+2. `npm login` once on the machine. Publishing may ask for a 2FA code or browser confirmation.
 
-   ```sh
-   git add CHANGELOG.md
-   npm version X.Y.Z -m "chore(release): %s"
-   ```
+### What `release.sh` does
 
-   `npm version` updates `package.json` and `package-lock.json`, includes the staged changelog in the commit and creates the annotated tag `vX.Y.Z`.
-4. Push the commit and the tag: `git push origin main --follow-tags`.
-5. Publish the GitHub Release with the changelog section as notes:
+It checks everything first and changes nothing if a check fails:
 
-   ```sh
-   awk '/^## \[X.Y.Z\]/{f=1;next} /^## \[/{f=0} f' CHANGELOG.md > release-notes.md
-   gh release create vX.Y.Z --title "pi-jewter X.Y.Z" --notes-file release-notes.md
-   rm release-notes.md
-   ```
+- current branch is `main`, the working tree is clean, and `main` equals `origin/main`;
+- the version looks like `1.2.3` or `1.2.3-rc.1` (a leading `v` is accepted) and is higher than `package.json`;
+- `CHANGELOG.md` has non-empty Unreleased entries and no section for this version yet;
+- the tag does not exist locally or on `origin`;
+- npm does not have this version, and a stable version is higher than npm `latest`;
+- you are logged in to npm (`npm whoami`);
+- `npm ci --ignore-scripts`, `npm run check` and `npm pack --dry-run` pass.
 
-6. Watch the **Release** workflow (`gh run watch`). Then check `npm view pi-jewter version` and an external install: `pi install npm:pi-jewter` in a separate Pi environment.
+Then it moves the Unreleased entries under `## [X.Y.Z]`, sets the version in `package.json` and `package-lock.json`, commits `chore(release): X.Y.Z`, creates the annotated tag `vX.Y.Z`, runs `npm publish`, and finally pushes `main` and the tag with `git push --atomic`.
 
-For a pre-release, use a version such as `X.Y.Z-rc.1`, give it its own `## [X.Y.Z-rc.1]` changelog section, and create the GitHub Release with `--prerelease`. It is published under the npm dist-tag `next`, so `latest` does not change.
+Pre-releases such as `X.Y.Z-rc.1` are published under the npm dist-tag `next`, so `latest` does not change. Stable versions use `latest`.
 
-### What the workflow checks
+### When something fails
 
-`scripts/release-check.ts` refuses to publish when:
+- **A check fails:** nothing was changed. Fix the reported problem and run again.
+- **`npm publish` fails** (2FA, network, permissions): the commit and tag exist only locally; nothing was pushed. The script prints both options: retry `npm publish --access public --tag <dist-tag> && git push --atomic origin main vX.Y.Z`, or undo with `git tag -d vX.Y.Z && git reset --hard HEAD~1`.
+- **The push fails after publishing:** the version is on npm, but the commit and tag are local. Run `git push --atomic origin main vX.Y.Z`. Atomic push sends both or neither, so `origin` never gets a tag without its commit.
 
-- the tag is not exactly `v` + the `package.json` version;
-- `CHANGELOG.md` has no `## [X.Y.Z]` heading;
-- the pre-release flag of the GitHub Release and the version disagree;
-- a stable version is lower than the current npm `latest` (publish backports manually with an explicit dist-tag).
+npm versions cannot be republished, and unpublishing is restricted. Use `--dry-run` first when in doubt.
 
-If the version is already on npm, the workflow succeeds without publishing, so re-running a release is harmless. Otherwise it runs `npm ci --ignore-scripts`, `npm run check` and `npm pack --dry-run` on the tagged commit before `npm publish`. Publishing an existing tag again is possible through **Run workflow** (`workflow_dispatch`) with the tag name.
+### After a release
 
-The job runs in the GitHub environment `npm`. Add required reviewers to that environment under *Settings → Environments* if every publish should need a manual approval.
+Check `npm view pi-jewter version` and an external install, `pi install npm:pi-jewter`, in a separate Pi environment. Optionally create a GitHub Release for the tag with the changelog section as notes:
 
-### Authentication: npm trusted publishing
+```sh
+awk '/^## \[X.Y.Z\]/{f=1;next} /^## \[/{f=0} f' CHANGELOG.md > /tmp/release-notes.md
+gh release create vX.Y.Z --title "pi-jewter X.Y.Z" --notes-file /tmp/release-notes.md
+```
 
-The workflow has no npm token. It authenticates with npm [trusted publishing](https://docs.npmjs.com/trusted-publishers) through GitHub's OIDC, and npm attaches provenance to the published version. npm accepts a trusted publisher only for a package that already exists, so the **first version is published manually**, once:
+A GitHub Release is documentation only; it does not publish anything.
 
-1. Log in and publish from a clean checkout of the release tag:
-
-   ```sh
-   npm login
-   git switch --detach vX.Y.Z
-   npm ci --ignore-scripts && npm run check
-   npm publish --access public
-   git switch main
-   ```
-
-2. Link the package to the workflow (requires 2FA on the npm account and npm 11.15+):
-
-   ```sh
-   npm trust github pi-jewter --repo bobuk/pi-jewter --file release.yml --env npm --allow-publish
-   ```
-
-   Or add the same trusted publisher on npmjs.com: package → *Settings* → *Trusted publishing* → GitHub Actions, workflow `release.yml`, environment `npm`.
-3. Optionally restrict the package to trusted publishing in its npm settings, so leaked tokens cannot publish.
-
-From then on, publishing a GitHub Release is the whole publishing step. Renaming the workflow file or the environment breaks the trust link until it is updated on npm.
+`release.sh` and `scripts/release.ts` stay in the repository and are not part of the npm package. `NPM=/path/to/npm` overrides the npm executable, which the release tests use to stub publishing.

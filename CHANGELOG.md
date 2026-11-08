@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-- Releases are tagged `vX.Y.Z` in Git, and publishing a GitHub Release publishes the package to npm through trusted publishing (OIDC, with provenance). The release check refuses mismatched tags, missing changelog sections, pre-release mix-ups and versions lower than npm `latest`, and skips versions already on npm. Versions 0.1.0 and 0.2.0 were tagged in Git only and never published to npm.
+- `./release.sh X.Y.Z` cuts a release: after checking branch, clean tree, version, changelog, npm registry, npm login and the test suite, it moves the Unreleased entries under the version, commits, tags `vX.Y.Z`, publishes to npm (`next` for pre-releases) and pushes atomically. `--dry-run` changes nothing. Versions 0.1.0 and 0.2.0 were tagged in Git only and never published to npm.
 - Rebuilt the user documentation with a quick start, complete configuration reference, workflows/profiles, evidence and privacy limits, troubleshooting, and development/evaluation guides. Reference docs are included in the npm package.
 - Verification hints now distinguish recognized test runs from build/typecheck commands and account for successful shell patch/generator commands and third-party patch/write tools when their effects are observable.
 - Jev's complexity question now rates the capability a request needs (knowledge, judgement, risk) instead of prompt length or file count: large mechanical edits are trivial, short high-stakes requests such as deploy or harden are complex.
