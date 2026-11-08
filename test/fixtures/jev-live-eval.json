@@ -1,0 +1,29 @@
+{
+  "about": "Labelled prompts for scripts/jev-eval.ts. roles/tiers list every acceptable answer; tiers are omitted when the prompt alone cannot decide.",
+  "cases": [
+    { "prompt": "переименуй функцию getUser в fetchUser во всём репозитории", "roles": ["implementation", "quick"], "tiers": ["fast"] },
+    { "prompt": "update the copyright year in all 300 source file headers", "roles": ["quick", "implementation"], "tiers": ["fast"] },
+    { "prompt": "поправь опечатку в README", "roles": ["quick"], "tiers": ["fast"] },
+    { "prompt": "что делает функция resolveTier?", "roles": ["quick", "research"], "tiers": ["fast"] },
+    { "prompt": "explain this stack trace", "roles": ["quick", "research"], "tiers": ["fast", "medium"] },
+    { "prompt": "add a --verbose flag to the CLI", "roles": ["implementation"], "tiers": ["fast", "medium"] },
+    { "prompt": "добавь в настройки флаг для отключения уведомлений", "roles": ["implementation"], "tiers": ["medium", "fast"] },
+    { "prompt": "замени все var на const в src, где это безопасно", "roles": ["implementation", "quick"], "tiers": ["fast", "medium"] },
+    { "prompt": "задеплой проект на 10.0.0.5: обнови, защити, укрепи, оптимизируй", "roles": ["implementation"], "tiers": ["strong"] },
+    { "prompt": "harden the production server config", "roles": ["implementation", "verification", "review"], "tiers": ["strong"] },
+    { "prompt": "мигрируй продовую базу на новую схему без даунтайма", "roles": ["implementation", "planning"], "tiers": ["strong"] },
+    { "prompt": "найди, почему иногда теряются сообщения в очереди при рестарте брокера", "roles": ["implementation", "verification", "research"], "tiers": ["strong"] },
+    { "prompt": "воспроизведи баг из crash report: segfault в compaction при конкурентной записи", "roles": ["verification", "implementation"], "tiers": ["strong"] },
+    { "prompt": "прогони тесты и почини то, что упадёт", "roles": ["verification", "implementation"], "tiers": ["medium"] },
+    { "prompt": "напиши property-based тесты для парсера дат", "roles": ["verification"], "tiers": ["medium"] },
+    { "prompt": "make sure the fix for the retry bug actually works, try the edge cases", "roles": ["verification"], "tiers": ["medium", "strong"] },
+    { "prompt": "проверь свежие уязвимости в зависимостях и закрой их", "roles": ["verification", "review", "implementation"], "tiers": ["medium", "strong"] },
+    { "prompt": "сделай ревью этого PR на регрессии", "roles": ["review"], "tiers": ["medium"] },
+    { "prompt": "проведи аудит безопасности модуля аутентификации", "roles": ["review"], "tiers": ["strong"] },
+    { "prompt": "спроектируй систему плагинов для этого CLI", "roles": ["planning"], "tiers": ["strong"] },
+    { "prompt": "write a migration plan from REST to gRPC for our services", "roles": ["planning"], "tiers": ["strong"] },
+    { "prompt": "набросай пару вариантов, как может выглядеть экран настроек", "roles": ["planning"], "tiers": ["fast", "medium"] },
+    { "prompt": "исследуй, какие есть библиотеки CRDT для TypeScript, и сравни их", "roles": ["research"], "tiers": ["medium"] },
+    { "prompt": "привет", "roles": ["none"] }
+  ]
+}
