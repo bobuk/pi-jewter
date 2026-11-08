@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { checkRelease, compareVersions, fetchRegistry, isMain, promoteChangelog, unreleasedEntries } from "../scripts/release.ts";
+import { checkRelease, compareVersions, distTagFor, fetchRegistry, fillUnreleased, isMain, nextPatch, promoteChangelog, releaseNotes, unreleasedEntries } from "../scripts/release.ts";
 
 const changelog = "# Changelog\n\n## [Unreleased]\n\n- Added verification hints.\n\n## [0.2.0]\n\n- Menu.\n";
 const check = (over: Partial<Parameters<typeof checkRelease>[0]> = {}) =>
@@ -82,4 +82,31 @@ test("registry lookup treats 404 as never published and reports other failures",
   let url = "";
   await fetchRegistry("@scope/pkg", (async (u: string) => { url = u; return new Response("{}", { status: 404 }); }) as unknown as typeof fetch);
   assert.equal(url, "https://registry.npmjs.org/@scope%2Fpkg");
+});
+
+test("release notes are the body of one version section", () => {
+  const log = "# Changelog\n\n## [Unreleased]\n\n## [0.3.1]\n\n- Added psst.\n\n## [0.3.0]\n\n- Older.\n";
+  assert.equal(releaseNotes(log, "0.3.1"), "- Added psst.");
+  assert.equal(releaseNotes(log, "0.3.0"), "- Older.");
+  assert.equal(releaseNotes(log, "0.3"), undefined);
+  assert.equal(releaseNotes(log, "0.2.0"), undefined);
+});
+
+test("filling Unreleased replaces only its entries", () => {
+  const empty = "# Changelog\n\n## [Unreleased]\n\n## [0.2.0]\n\n- Menu.\n";
+  const filled = fillUnreleased(empty, "- Added A.\n- Fixed B.\n");
+  assert.equal(filled, "# Changelog\n\n## [Unreleased]\n\n- Added A.\n- Fixed B.\n\n## [0.2.0]\n\n- Menu.\n");
+  assert.equal(unreleasedEntries(filled), "- Added A.\n- Fixed B.");
+  assert.equal(fillUnreleased(filled, "- Only C."), "# Changelog\n\n## [Unreleased]\n\n- Only C.\n\n## [0.2.0]\n\n- Menu.\n");
+  assert.equal(fillUnreleased("## [Unreleased]\n- old\n", "- new"), "## [Unreleased]\n\n- new\n\n");
+  assert.throws(() => fillUnreleased("## [0.2.0]\n", "- x"), /no "## \[Unreleased\]"/);
+});
+
+test("next patch and dist-tag follow semver", () => {
+  assert.equal(nextPatch("0.3.0"), "0.3.1");
+  assert.equal(nextPatch("0.3.9"), "0.3.10");
+  assert.equal(nextPatch("1.0.0-rc.2"), "1.0.0");
+  assert.throws(() => nextPatch("v1"));
+  assert.equal(distTagFor("0.3.1"), "latest");
+  assert.equal(distTagFor("1.0.0-rc.1"), "next");
 });

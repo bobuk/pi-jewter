@@ -7,6 +7,18 @@
  *   node --experimental-strip-types scripts/release.ts changelog X.Y.Z
  *     Moves the Unreleased entries under `## [X.Y.Z]` and leaves an empty
  *     Unreleased section above it.
+ *   node --experimental-strip-types scripts/release.ts notes X.Y.Z
+ *     Prints the CHANGELOG.md section for X.Y.Z (GitHub Release notes).
+ *   node --experimental-strip-types scripts/release.ts unreleased
+ *     Prints the Unreleased entries (empty output when there are none).
+ *   node --experimental-strip-types scripts/release.ts fill
+ *     Replaces the Unreleased entries with the text read from stdin.
+ *   node --experimental-strip-types scripts/release.ts next
+ *     Prints the next patch version after package.json.
+ *   node --experimental-strip-types scripts/release.ts published X.Y.Z
+ *     Prints `yes` when npm already has X.Y.Z, otherwise `no`.
+ *   node --experimental-strip-types scripts/release.ts disttag X.Y.Z
+ *     Prints the npm dist-tag for X.Y.Z (`next` for pre-releases).
  */
 import { readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -79,6 +91,37 @@ export function promoteChangelog(changelog: string, version: string): string {
   return changelog.replace(UNRELEASED, `## [Unreleased]\n\n## [${version}]\n`);
 }
 
+/** The body of `## [version]`, without its heading, or undefined when absent. */
+export function releaseNotes(changelog: string, version: string): string | undefined {
+  const match = new RegExp(`^## \\[${escape(version)}\\][^\\n]*\\n`, "m").exec(changelog);
+  if (!match) return undefined;
+  const rest = changelog.slice(match.index + match[0].length);
+  const next = rest.search(/^## /m);
+  return (next < 0 ? rest : rest.slice(0, next)).trim();
+}
+
+/** Replace the Unreleased entries with `entries`, keeping every other section. */
+export function fillUnreleased(changelog: string, entries: string): string {
+  const match = UNRELEASED.exec(changelog);
+  if (!match) throw new Error(`CHANGELOG.md has no "## [Unreleased]" section`);
+  const start = match.index + match[0].length;
+  const rest = changelog.slice(start);
+  const next = rest.search(/^## /m);
+  const tail = next < 0 ? "" : rest.slice(next);
+  const body = entries.trim();
+  return `${changelog.slice(0, start)}\n${body ? `${body}\n\n` : ""}${tail}`;
+}
+
+/** Next patch version: 1.2.3 -> 1.2.4, 1.2.3-rc.1 -> 1.2.3. */
+export function nextPatch(current: string): string {
+  const match = SEMVER.exec(current);
+  if (!match) throw new Error(`not a semver version: ${current}`);
+  if (match[4] !== undefined) return `${match[1]}.${match[2]}.${match[3]}`;
+  return `${match[1]}.${match[2]}.${Number(match[3]) + 1}`;
+}
+
+export const distTagFor = (version: string): "latest" | "next" => version.includes("-") ? "next" : "latest";
+
 /** Registry state for a package; a 404 means it has never been published. */
 export async function fetchRegistry(name: string, fetchImpl: typeof fetch = fetch): Promise<RegistryState> {
   const response = await fetchImpl(`https://registry.npmjs.org/${encodeURIComponent(name).replace("%40", "@")}`, {
@@ -92,14 +135,28 @@ export async function fetchRegistry(name: string, fetchImpl: typeof fetch = fetc
 
 async function main(): Promise<void> {
   const [command, version] = process.argv.slice(2);
-  if (!version || (command !== "check" && command !== "changelog")) throw new Error("usage: release.ts check|changelog X.Y.Z");
-  const changelog = readFileSync("CHANGELOG.md", "utf8");
-  if (command === "changelog") {
-    writeFileSync("CHANGELOG.md", promoteChangelog(changelog, version));
-    return;
+  const needsVersion = new Set(["check", "changelog", "notes", "published", "disttag"]);
+  const known = new Set([...needsVersion, "unreleased", "fill", "next"]);
+  if (!command || !known.has(command) || (needsVersion.has(command) && !version)) {
+    throw new Error("usage: release.ts check|changelog|notes|published|disttag X.Y.Z, or release.ts unreleased|fill|next");
   }
   const pkg = JSON.parse(readFileSync("package.json", "utf8")) as { name: string; version: string };
-  const result = checkRelease({ version, current: pkg.version, changelog, registry: await fetchRegistry(pkg.name) });
+  const changelog = () => readFileSync("CHANGELOG.md", "utf8");
+  switch (command) {
+    case "changelog": writeFileSync("CHANGELOG.md", promoteChangelog(changelog(), version!)); return;
+    case "unreleased": { const entries = unreleasedEntries(changelog()); if (entries) console.log(entries); return; }
+    case "fill": writeFileSync("CHANGELOG.md", fillUnreleased(changelog(), readFileSync(0, "utf8"))); return;
+    case "next": console.log(nextPatch(pkg.version)); return;
+    case "disttag": console.log(distTagFor(version!)); return;
+    case "notes": {
+      const notes = releaseNotes(changelog(), version!);
+      if (notes === undefined) throw new Error(`CHANGELOG.md has no "## [${version}]" section`);
+      console.log(notes);
+      return;
+    }
+    case "published": console.log((await fetchRegistry(pkg.name)).versions.includes(version!) ? "yes" : "no"); return;
+  }
+  const result = checkRelease({ version: version!, current: pkg.version, changelog: changelog(), registry: await fetchRegistry(pkg.name) });
   if (!result.ok) throw new Error(result.error);
   console.log(result.distTag);
 }

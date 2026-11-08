@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 - Added `/psst <question>`: a Jev-routed, read-only side conversation with isolated bounded history, `/psst clear`, `/psst abort`, and explicit `/psst inject` handoff.
+- `./release.sh` is interactive and resumable: it logs in to npm and GitHub when needed, prompts for a one-time password, drafts an empty changelog from commits, publishes, pushes and creates the GitHub Release; re-running it finishes an interrupted release.
 
 ## [0.3.0]
 

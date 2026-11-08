@@ -136,53 +136,33 @@ Documentation should distinguish intended policy, observed facts, heuristics and
 
 ## Releasing
 
-Every release is a Git tag `vX.Y.Z` that matches `package.json`, plus the same version on npm. Both come from one command, run by a maintainer who is logged in to npm:
+Every release is a Git tag `vX.Y.Z` that matches `package.json`, the same version on npm, and a GitHub Release with the changelog section as notes. All three come from one interactive command, run in a terminal:
 
 ```sh
-./release.sh X.Y.Z --dry-run   # all checks, preview of the changelog section, `npm publish --dry-run`; files restored
-./release.sh X.Y.Z             # commit, tag, publish to npm, push
+./release.sh            # suggests the next patch version, or resumes an unfinished release
+./release.sh X.Y.Z      # release a specific version
+./release.sh --dry-run  # all checks and `npm publish --dry-run`; files restored
 ```
 
-`pi update git:github.com/bobuk/pi-jewter` fetches Git commits; it does not publish a release. `pi update npm:pi-jewter` retrieves the npm `latest` version, not unreleased commits.
-
-### Before running it
-
-1. Describe the release under `## [Unreleased]` in `CHANGELOG.md`, commit and push. The script refuses an empty Unreleased section.
-2. `npm login` once on the machine. Publishing may ask for a 2FA code or browser confirmation.
+Everything committed on `main` goes into the release. `pi update git:github.com/bobuk/pi-jewter` fetches Git commits; `pi update npm:pi-jewter` retrieves the npm `latest` version.
 
 ### What `release.sh` does
 
-It checks everything first and changes nothing if a check fails:
+1. Checks that you are on `main`, the tree is clean, and `origin/main` has nothing you have not pulled. Unpushed local commits are fine: they are pushed with the release.
+2. Logs you in if needed: `npm login` and `gh auth login` run in the same terminal, including browser and one-time-password prompts.
+3. If the `## [Unreleased]` section of `CHANGELOG.md` is empty, drafts it from commit subjects since the last tag and offers to open it in `$VISUAL`/`$EDITOR`.
+4. Validates the version (higher than `package.json` and npm `latest`, not already tagged or published), then runs `npm ci --ignore-scripts`, `npm run check` and `npm pack --dry-run`.
+5. Shows the version, the commits to be pushed and the release notes, and asks for confirmation. Nothing has changed up to this point.
+6. Moves the Unreleased entries under `## [X.Y.Z]`, sets the version in `package.json` and `package-lock.json`, commits `chore(release): X.Y.Z` and creates the annotated tag `vX.Y.Z`.
+7. Publishes to npm. If npm asks for a one-time password, the script prompts for it and retries.
+8. Pushes `main` and the tag with `git push --atomic`, creates the GitHub Release, and checks that npm shows the new version.
 
-- current branch is `main`, the working tree is clean, and `main` equals `origin/main`;
-- the version looks like `1.2.3` or `1.2.3-rc.1` (a leading `v` is accepted) and is higher than `package.json`;
-- `CHANGELOG.md` has non-empty Unreleased entries and no section for this version yet;
-- the tag does not exist locally or on `origin`;
-- npm does not have this version, and a stable version is higher than npm `latest`;
-- you are logged in to npm (`npm whoami`);
-- `npm ci --ignore-scripts`, `npm run check` and `npm pack --dry-run` pass.
-
-Then it moves the Unreleased entries under `## [X.Y.Z]`, sets the version in `package.json` and `package-lock.json`, commits `chore(release): X.Y.Z`, creates the annotated tag `vX.Y.Z`, runs `npm publish`, and finally pushes `main` and the tag with `git push --atomic`.
-
-Pre-releases such as `X.Y.Z-rc.1` are published under the npm dist-tag `next`, so `latest` does not change. Stable versions use `latest`.
+Pre-releases such as `X.Y.Z-rc.1` are published under the npm dist-tag `next` and marked as GitHub pre-releases; `latest` does not change.
 
 ### When something fails
 
-- **A check fails:** nothing was changed. Fix the reported problem and run again.
-- **`npm publish` fails** (2FA, network, permissions): the commit and tag exist only locally; nothing was pushed. The script prints both options: retry `npm publish --access public --tag <dist-tag> && git push --atomic origin main vX.Y.Z`, or undo with `git tag -d vX.Y.Z && git reset --hard HEAD~1`.
-- **The push fails after publishing:** the version is on npm, but the commit and tag are local. Run `git push --atomic origin main vX.Y.Z`. Atomic push sends both or neither, so `origin` never gets a tag without its commit.
+Run `./release.sh` again. When `HEAD` is a `chore(release): X.Y.Z` commit with its tag, the script resumes that release and skips every step that is already done: an existing npm version is not republished, an existing push or GitHub Release is not repeated. Before the release commit is created, any failure or cancellation restores `CHANGELOG.md`, `package.json` and `package-lock.json`.
 
-npm versions cannot be republished, and unpublishing is restricted. Use `--dry-run` first: it applies the changelog and version changes temporarily, shows the resulting changelog section and the exact tarball, and restores the files even if a step fails.
-
-### After a release
-
-Check `npm view pi-jewter version` and an external install, `pi install npm:pi-jewter`, in a separate Pi environment. Optionally create a GitHub Release for the tag with the changelog section as notes:
-
-```sh
-awk '/^## \[X.Y.Z\]/{f=1;next} /^## \[/{f=0} f' CHANGELOG.md > /tmp/release-notes.md
-gh release create vX.Y.Z --title "pi-jewter X.Y.Z" --notes-file /tmp/release-notes.md
-```
-
-A GitHub Release is documentation only; it does not publish anything.
+To abandon a release that was committed locally but not published or pushed: `git tag -d vX.Y.Z && git reset --hard HEAD~1`. npm versions cannot be republished, and unpublishing is restricted.
 
 `release.sh` and `scripts/release.ts` stay in the repository and are not part of the npm package. `NPM=/path/to/npm` overrides the npm executable, which the release tests use to stub publishing.
