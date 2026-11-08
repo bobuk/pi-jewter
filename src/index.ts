@@ -8,6 +8,7 @@ import type { RoutingRecord } from "./router/state.ts";
 import { registerCompaction } from "./compaction/extension.ts";
 import { registerReport } from "./report/extension.ts";
 import { registerVerify } from "./verify/extension.ts";
+import { registerPsst } from "./commands/psst.ts";
 
 export default function (pi: ExtensionAPI): void {
   let context: ExtensionContext | undefined;
@@ -40,6 +41,7 @@ export default function (pi: ExtensionAPI): void {
     shownWarnings = text;
   };
   registerCommands(pi, refresh);
+  registerPsst(pi, getConfig);
   pi.on("session_start", async (_event, ctx) => { refresh(ctx); });
   pi.on("session_tree", async (_event, ctx) => {
     context = ctx;

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Added `/psst <question>`: a Jev-routed, read-only side conversation with isolated bounded history, `/psst clear`, `/psst abort`, and explicit `/psst inject` handoff.
+
 ## [0.3.0]
 
 - `./release.sh X.Y.Z` cuts a release: after checking branch, clean tree, version, changelog, npm registry, npm login and the test suite, it moves the Unreleased entries under the version, commits, tags `vX.Y.Z`, publishes to npm (`next` for pre-releases) and pushes atomically. `--dry-run` changes nothing. Versions 0.1.0 and 0.2.0 were tagged in Git only and never published to npm.

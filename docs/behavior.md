@@ -2,6 +2,10 @@
 
 [README](../README.md) · [Configuration](configuration.md) · [Workflows](workflows.md)
 
+## `/psst` side questions
+
+`/psst <question>` uses the same Jev classifier and configured physical tiers as the main router, but keeps a separate, bounded in-memory Q&A history. It does not add side prompts or answers to the main transcript, does not inherit the main conversation, and has no tools. It cannot inspect files or make workspace changes. `/psst inject` places the side Q&A into the editor; the user decides whether to submit it. `/psst clear` empties the history. History is lost on session change or Pi restart.
+
 ## Routing
 
 The virtual router classifies **user requests**, not every tool continuation:
