@@ -8,7 +8,7 @@ Select `jewter/auto` once. On each user request, Jev proposes a **role** and a *
 
 Jewter also offers **verification hints** after edits and **opt-in selective compaction**. It does not write specifications, delegate work, run tests, or deploy software by itself.
 
-> This README describes the current repository. Features under [Unreleased in the changelog](CHANGELOG.md#unreleased) may not be in the published npm version yet. Use the Git source if you need current `main`.
+> This README describes the current repository. Features under [Unreleased in the changelog](CHANGELOG.md#unreleased) are not in any release yet. Use the Git source if you need current `main`.
 
 ## Documentation
 
@@ -26,14 +26,14 @@ Requires Pi **1.5.0+** (tested with 1.5.0), Node **22.19.0+**, a Jev credential,
 ### 1. Install one source
 
 ```sh
-# Published version
+# Released version from npm
 pi install npm:pi-jewter
 
-# Or current main
+# Or current main from Git
 pi install git:github.com/bobuk/pi-jewter
 ```
 
-Run `/reload` if Pi is already open. Do not load the npm, Git and local copies together.
+Releases are Git tags `vX.Y.Z`; each GitHub Release is published to npm automatically. If [npm](https://www.npmjs.com/package/pi-jewter) does not list the package yet, install from Git. Run `/reload` if Pi is already open. Do not load the npm, Git and local copies together.
 
 ### 2. Provide a Jev credential
 

@@ -1,0 +1,72 @@
+name: Release
+
+# Publishes to npm when a GitHub release is published for a tag vX.Y.Z.
+# Authentication uses npm trusted publishing (OIDC): no npm token is stored in
+# the repository. See docs/development.md#releasing.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to publish, for example v0.3.0
+        required: true
+      prerelease:
+        description: Publish as a pre-release (dist-tag next)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      RELEASE_PRERELEASE: ${{ github.event.release.prerelease || inputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.x
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      # Trusted publishing needs npm 11.5.1 or newer.
+      - name: Ensure npm supports trusted publishing
+        run: |
+          if ! node -e 'const [a,b,c]=process.argv[1].split(".").map(Number);process.exit(a>11||(a===11&&(b>5||(b===5&&c>=1)))?0:1)' "$(npm --version)"; then
+            npm install -g npm@^11.5.1
+          fi
+          npm --version
+
+      - name: Check release metadata
+        id: plan
+        run: |
+          flag=""
+          if [ "$RELEASE_PRERELEASE" = "true" ]; then flag="--prerelease"; fi
+          node --experimental-strip-types scripts/release-check.ts "$RELEASE_TAG" $flag
+
+      - run: npm ci --ignore-scripts
+
+      - run: npm run check
+
+      - name: Check package contents
+        run: npm pack --dry-run
+
+      - name: Publish to npm
+        if: steps.plan.outputs.publish == 'true'
+        run: npm publish --access public --tag "${{ steps.plan.outputs.dist_tag }}"
