@@ -55,7 +55,7 @@ test("setup dialog prompt names both config files, available models and consent"
   assert.ok(prompt.includes(paths.project));
   assert.match(prompt, /pi --list-models/);
   assert.match(prompt, /openai-codex/);
-  assert.match(prompt, /planning, implementation, review, research, quick/);
+  assert.match(prompt, /planning, implementation, verification, review, research, quick/);
   assert.match(prompt, /Do not write anything until I confirm/);
   assert.match(prompt, /"provider\/id"/);
   assert.match(prompt, /\/reload/);

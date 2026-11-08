@@ -21,7 +21,7 @@ export function setupDialogPrompt(cwd: string): string {
     "- jev = { transport: \"auto|typesafe|openrouter\", model, baseUrl, minConfidence, fastMax, strongMin, tierMajority, timeoutMs }",
     "- ui = { notify: \"main|all|off\", footer, cards, report }",
     "",
-    "Ask me what to configure: which roles I need (shipped defaults are planning, implementation, review, research, quick), which models to assign to the tiers and roles, whether to enable compaction, and which agents should route through Jewter. Propose concrete provider/id values from the available models and briefly justify the choice. Account for my subscriptions (openai-codex, Claude) and my OpenRouter key.",
+    "Ask me what to configure: which roles I need (shipped defaults are planning, implementation, verification, review, research, quick), which models to assign to the tiers and roles, whether to enable compaction, and which agents should route through Jewter. Propose concrete provider/id values from the available models and briefly justify the choice. Account for my subscriptions (openai-codex, Claude) and my OpenRouter key.",
     "After I confirm, update the config (valid JSON, keep the other fields) and remind me to run /reload.",
   ].join("\n");
 }

@@ -41,3 +41,25 @@ test("agent discovery honors project precedence", () => {
 test("configPaths resolves the global file under the given agent directory", () => {
   assert.deepEqual(configPaths("/work/project", "/custom/agent"), { global: "/custom/agent/jewter.json", project: "/work/project/.pi/jewter.json" });
 });
+
+test("verification ships thinking-only overrides that keep tier models and survive a model override", () => {
+  const d = mkdtempSync(join(tmpdir(), "jewter-verify-"));
+  const agentDir = mkdtempSync(join(tmpdir(), "jewter-agent-"));
+  writeFileSync(join(agentDir, "jewter.json"), JSON.stringify({
+    tiers: { fast: { model: "x/fast", thinking: "low" }, medium: { model: "x/mid", thinking: "medium" }, strong: { model: "x/big", thinking: "medium" } },
+    roles: { verification: { tiers: { strong: { model: "x/opus" } } } },
+  }));
+  const config = loadConfig({ cwd: d, agentDir, env: {}, projectTrusted: false }).config;
+  assert.deepEqual(resolveTier(config, "verification", "fast"), { model: "x/fast", thinking: "medium" });
+  assert.deepEqual(resolveTier(config, "verification", "medium"), { model: "x/mid", thinking: "high" });
+  // A user-set model keeps the shipped thinking override unless thinking is set too.
+  assert.deepEqual(resolveTier(config, "verification", "strong"), { model: "x/opus", thinking: "high" });
+  assert.deepEqual(resolveTier(config, "implementation", "medium"), { model: "x/mid", thinking: "medium" });
+});
+
+test("a removed verification role stays removed", () => {
+  const d = mkdtempSync(join(tmpdir(), "jewter-verify-"));
+  const agentDir = mkdtempSync(join(tmpdir(), "jewter-agent-"));
+  writeFileSync(join(agentDir, "jewter.json"), JSON.stringify({ roles: { verification: null } }));
+  assert.equal(loadConfig({ cwd: d, agentDir, env: {}, projectTrusted: false }).config.roles.verification, undefined);
+});

@@ -11,13 +11,14 @@ export function defaultTiersSummary(config: JewterConfig): string {
   return TIER_NAMES.map(tier => shortModel(config.tiers[tier]?.model)).join(" · ");
 }
 
-/** Per-tier models of a role; inherited tiers are shown in parentheses. */
+/** Per-tier models of a role; inherited models are shown in parentheses, own thinking as `:level`. */
 export function roleTiersSummary(config: JewterConfig, role: string): string {
   const own = config.roles[role]?.tiers ?? {};
-  if (!TIER_NAMES.some(tier => own[tier]?.model)) return "(inherits)";
+  if (!TIER_NAMES.some(tier => own[tier]?.model || own[tier]?.thinking)) return "(inherits)";
   return TIER_NAMES.map(tier => {
     const model = shortModel(resolveTier(config, role, tier as TierName).model);
-    return own[tier]?.model ? model : `(${model})`;
+    const thinking = own[tier]?.thinking ? `:${own[tier]!.thinking}` : "";
+    return (own[tier]?.model ? model : `(${model})`) + thinking;
   }).join(" · ");
 }
 

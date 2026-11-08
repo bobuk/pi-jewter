@@ -135,3 +135,17 @@ test("buildJevQuestions includes every configured role and the none option", () 
   assert.ok(NO_ROLE in criteria);
   assert.equal(questions.complexity?.type, "score");
 });
+
+test("complexity question rates needed capability, not prompt size", () => {
+  const q = buildJevQuestions(defaultConfig()).complexity!;
+  assert.match(q.instructions ?? "", /not how long the prompt is or how many files it touches/);
+  assert.match(q.instructions ?? "", /large repetitive/);
+  assert.match(q.instructions ?? "", /high stakes/);
+  assert.doesNotMatch(q.instructions ?? "", /multi-file changes/);
+});
+
+test("verification is offered to Jev as its own role, separate from implementation", () => {
+  const criteria = buildJevQuestions(defaultConfig()).role!.criteria as Record<string, string>;
+  assert.match(criteria.verification ?? "", /tests/);
+  assert.doesNotMatch(criteria.implementation ?? "", /verif|tests/);
+});

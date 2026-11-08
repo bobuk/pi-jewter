@@ -30,6 +30,19 @@ export interface Decision {
   usage?: { inputTokens?: number; outputTokens?: number };
 }
 
+/**
+ * Complexity measures the capability a request needs, not its size: a short
+ * "deploy and harden" is complex, a rename across 200 files is trivial.
+ * Thoroughness is a separate axis, expressed through role thinking levels.
+ */
+export const COMPLEXITY_INSTRUCTIONS =
+  "Rate how much capability the work requested in `prompt` needs. Judge the knowledge, judgement and " +
+  "risk involved, not how long the prompt is or how many files it touches. " +
+  "Level 0 is trivial: lookups, questions about code already in context, precise mechanical edits, " +
+  "including large repetitive ones. Level 1 is moderate: ordinary feature work or bug fixes with a clear approach. " +
+  "Level 2 is complex: subtle or unreproduced bugs, unfamiliar domains, architecture decisions, ambiguous goals, " +
+  "and short requests with high stakes such as deploying, securing, or migrating production systems.";
+
 /** Build the two Jev questions from the configured roles. */
 export function buildJevQuestions(config: JewterConfig): JevQuestions {
   const criteria: Record<string, string | null> = {};
@@ -48,10 +61,7 @@ export function buildJevQuestions(config: JewterConfig): JevQuestions {
     },
     [COMPLEXITY_QUESTION]: {
       type: "score",
-      instructions:
-        "Rate how demanding the work requested in `prompt` is: level 0 is trivial " +
-        "(small questions, quick lookups, single-line mechanical edits), level 2 is complex " +
-        "(multi-file changes, subtle debugging, architecture decisions).",
+      instructions: COMPLEXITY_INSTRUCTIONS,
       criteria: ["trivial", "moderate", "complex"],
     },
   };

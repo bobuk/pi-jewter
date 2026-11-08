@@ -24,14 +24,19 @@ test("shortModel keeps only the last path segment", () => {
 test("models row summarizes default tiers and role count", () => {
   const c = configured();
   assert.equal(defaultTiersSummary(c), "gpt-6-luna · gpt-6.1-sol · deepseek-v4.1-flash");
-  assert.equal(modelsSummary(c), "fast gpt-6-luna · medium gpt-6.1-sol · strong deepseek-v4.1-flash · 5 roles");
-  assert.match(modelsSummary(defaultConfig()), /fast — · medium — · strong — · 5 roles/);
+  assert.equal(modelsSummary(c), "fast gpt-6-luna · medium gpt-6.1-sol · strong deepseek-v4.1-flash · 6 roles");
+  assert.match(modelsSummary(defaultConfig()), /fast — · medium — · strong — · 6 roles/);
 });
 
 test("role rows mark inherited tiers in parentheses", () => {
   const c = configured();
   assert.equal(roleTiersSummary(c, "review"), "(gpt-6-luna) · claude-opus-5-5 · claude-opus-5-5");
   assert.equal(roleTiersSummary(c, "implementation"), "(inherits)");
+});
+
+test("role rows show thinking-only overrides on inherited models", () => {
+  const c = configured();
+  assert.equal(roleTiersSummary(c, "verification"), "(gpt-6-luna):medium · (gpt-6.1-sol):high · (deepseek-v4.1-flash):high");
 });
 
 test("compaction, display and advanced rows show current values", () => {

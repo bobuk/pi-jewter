@@ -126,7 +126,12 @@ export const DEFAULT_ROLES: Record<string, RoleConfig> = {
     description: "Planning, design, and architecture decisions before implementation",
   },
   implementation: {
-    description: "Writing, changing, or fixing code; running tests and verifications",
+    description: "Writing, changing, or fixing code toward a known goal; quick build-and-iterate loops",
+  },
+  verification: {
+    description: "Checking that existing work is correct: running or writing tests, reproducing bugs, probing edge cases, validating a fix before it ships",
+    // Thoroughness matters more than capability here: keep the tier models, raise the effort.
+    tiers: { fast: { thinking: "medium" }, medium: { thinking: "high" }, strong: { thinking: "high" } },
   },
   review: {
     description: "Reviewing code, plans, or diffs; finding problems, risks, and regressions",
