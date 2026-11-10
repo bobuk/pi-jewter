@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Added manual TypeSafe API key entry, replacement and removal in `/jewter` → **Advanced**, with environment credential precedence and a warning before saving a key in project scope.
+
 ## [0.3.1]
 
 - Added `/psst <question>`: a Jev-routed, read-only side conversation with isolated bounded history, `/psst clear`, `/psst abort`, and explicit `/psst inject` handoff.

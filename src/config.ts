@@ -41,6 +41,8 @@ export interface RoleConfig {
 
 export interface JevConfig {
   transport: Transport;
+  /** Manually configured TypeSafe credential; environment keys take precedence. */
+  typesafeApiKey?: string;
   /** Override the transport's default model slug. */
   model?: string;
   /** Override the transport's default endpoint. */
@@ -340,6 +342,8 @@ export function normalizeConfig(raw: unknown, base: JewterConfig = defaultConfig
     if (typeof jev.transport === "string" && (TRANSPORTS as readonly string[]).includes(jev.transport)) {
       config.jev.transport = jev.transport as Transport;
     }
+    const typesafeApiKey = asString(jev.typesafeApiKey)?.trim();
+    if (typesafeApiKey) config.jev.typesafeApiKey = typesafeApiKey;
     const model = asString(jev.model);
     if (model) config.jev.model = model;
     const baseUrl = asString(jev.baseUrl);

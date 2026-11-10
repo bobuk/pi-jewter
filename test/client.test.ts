@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { defaultConfig } from "../src/config.ts";
+import { defaultConfig, normalizeConfig } from "../src/config.ts";
 import { JevClient, JevError, resolveTransport } from "../src/jev/client.ts";
 
 function jevConfig(overrides: Partial<Parameters<typeof resolveTransport>[0]> = {}) {
@@ -13,6 +13,44 @@ test("resolveTransport: auto prefers TypeSafe when both keys exist", () => {
   assert.equal(result.transport.id, "typesafe");
   assert.equal(result.transport.apiKey, "ts");
   assert.equal(result.transport.model, "jev-latest");
+});
+
+test("resolveTransport: saved TypeSafe key is normalized and preferred over OpenRouter in auto", () => {
+  const { config } = normalizeConfig({ jev: { typesafeApiKey: "  saved-key  " } });
+  assert.equal(config.jev.typesafeApiKey, "saved-key");
+  const result = resolveTransport(config.jev, { OPENROUTER_API_KEY: "or" });
+  assert.ok(result.ok);
+  assert.equal(result.transport.id, "typesafe");
+  assert.equal(result.transport.apiKey, "saved-key");
+});
+
+test("resolveTransport: environment credentials override the saved TypeSafe key", () => {
+  for (const [env, expected] of [
+    [{ TYPESAFE_API_KEY: " ts " }, "ts"],
+    [{ TYPESAFE_API_KEY: "ts", JEWTER_API_KEY: " override " }, "override"],
+    [{ TYPESAFE_API_KEY: "   " }, "saved"],
+  ] as const) {
+    const result = resolveTransport(jevConfig({ transport: "typesafe", typesafeApiKey: " saved " }), env);
+    assert.ok(result.ok);
+    assert.equal(result.transport.apiKey, expected);
+  }
+});
+
+test("resolveTransport: saved TypeSafe key is never used for explicit OpenRouter", () => {
+  const config = jevConfig({ transport: "openrouter", typesafeApiKey: "saved" });
+  assert.equal(resolveTransport(config, {}).ok, false);
+  const result = resolveTransport(config, { OPENROUTER_API_KEY: "or" });
+  assert.ok(result.ok);
+  assert.equal(result.transport.id, "openrouter");
+  assert.equal(result.transport.apiKey, "or");
+});
+
+test("resolveTransport: blank or invalid saved keys are ignored", () => {
+  for (const typesafeApiKey of ["   ", 123, null]) {
+    const { config } = normalizeConfig({ jev: { typesafeApiKey } });
+    assert.equal(config.jev.typesafeApiKey, undefined);
+    assert.equal(resolveTransport(config.jev, {}).ok, false);
+  }
 });
 
 test("resolveTransport: auto falls back to OpenRouter", () => {

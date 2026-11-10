@@ -234,6 +234,7 @@ export async function menu(ctx: ExtensionCommandContext, refresh: () => void, on
     return [
       { value: "routing", label: "Routing", description: onOff(c.enabled) },
       { value: "transport", label: "Jev transport", description: c.jev.transport },
+      { value: "typesafeApiKey", label: "TypeSafe API key", description: c.jev.typesafeApiKey ? "saved · environment overrides" : "not saved" },
       { value: "model", label: "Jev model", description: c.jev.model ?? "default" },
       { value: "baseUrl", label: "Jev endpoint", description: c.jev.baseUrl ?? "default" },
       { value: "timeoutMs", label: "Jev timeout (ms)", description: String(c.jev.timeoutMs) },
@@ -251,6 +252,13 @@ export async function menu(ctx: ExtensionCommandContext, refresh: () => void, on
     if (choice === "transport") {
       const transport = await pickWithSearch(ctx, "Jev transport", TRANSPORTS.map(value => ({ value, label: value })), { current: c.jev.transport, initial: c.jev.transport });
       if (transport) save(d => { d.jev ??= {}; d.jev.transport = transport; });
+      return;
+    }
+    if (choice === "typesafeApiKey") {
+      if (scope === "project" && !await ctx.ui.confirm("Save a secret in this project?", "The key is stored as plain text in .pi/jewter.json. Do not commit it. Use global scope to keep it outside the repository.")) return;
+      const value = await ctx.ui.input("TypeSafe API key (plain text; empty removes saved key)");
+      if (value === undefined) return;
+      save(d => { d.jev ??= {}; if (value.trim()) d.jev.typesafeApiKey = value.trim(); else delete d.jev.typesafeApiKey; });
       return;
     }
     if (choice === "model" || choice === "baseUrl") {

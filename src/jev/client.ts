@@ -15,17 +15,18 @@ export type TransportResolution = { ok: true; transport: ResolvedTransport } | {
 /**
  * Resolve the effective Jev transport.
  *
- * `auto` prefers TypeSafe when `TYPESAFE_API_KEY` (or `JEWTER_API_KEY`) is
- * present, then OpenRouter. `JEWTER_API_KEY` overrides the selected
- * transport's own credential variable.
+ * `auto` prefers TypeSafe when an environment or manually configured key is
+ * present, then OpenRouter. Environment credentials override the saved key;
+ * `JEWTER_API_KEY` overrides the selected transport's own credential variable.
  */
 export function resolveTransport(jev: JevConfig, env: EnvLike): TransportResolution {
   const overrideKey = env.JEWTER_API_KEY?.trim();
+  const typesafeKey = env.TYPESAFE_API_KEY?.trim() || jev.typesafeApiKey?.trim();
   const pick = (id: "typesafe" | "openrouter"): TransportResolution => {
     const meta = JEV_TRANSPORTS[id];
-    const apiKey = overrideKey || env[meta.envKey]?.trim();
+    const apiKey = overrideKey || (id === "typesafe" ? typesafeKey : env[meta.envKey]?.trim());
     if (!apiKey) {
-      return { ok: false, error: `no ${meta.envKey} (or JEWTER_API_KEY) for transport "${id}"` };
+      return { ok: false, error: `no ${meta.envKey} (or JEWTER_API_KEY${id === "typesafe" ? " or saved TypeSafe key" : ""}) for transport "${id}"` };
     }
     return {
       ok: true,
@@ -41,9 +42,9 @@ export function resolveTransport(jev: JevConfig, env: EnvLike): TransportResolut
 
   if (jev.transport === "typesafe") return pick("typesafe");
   if (jev.transport === "openrouter") return pick("openrouter");
-  if (overrideKey || env.TYPESAFE_API_KEY?.trim()) return pick("typesafe");
+  if (overrideKey || typesafeKey) return pick("typesafe");
   if (env.OPENROUTER_API_KEY?.trim()) return pick("openrouter");
-  return { ok: false, error: "no Jev credentials: set TYPESAFE_API_KEY, OPENROUTER_API_KEY, or JEWTER_API_KEY" };
+  return { ok: false, error: "no Jev credentials: enter a TypeSafe API key in /jewter → Advanced, or set TYPESAFE_API_KEY, OPENROUTER_API_KEY, or JEWTER_API_KEY" };
 }
 
 export class JevError extends Error {

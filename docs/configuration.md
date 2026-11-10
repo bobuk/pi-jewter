@@ -86,11 +86,14 @@ Jev is a classifier, not the model implementing your request. Its key is needed 
 | `typesafe` | `TYPESAFE_API_KEY` | `jev-latest` | `https://api.typesafe.ai/v1/systemone` |
 | `openrouter` | `OPENROUTER_API_KEY` | `typesafe/jev-1.13` | `https://openrouter.ai/api/alpha/decisions` |
 
-The OpenRouter decisions endpoint is alpha. Under `auto`, TypeSafe is preferred when `TYPESAFE_API_KEY` or `JEWTER_API_KEY` is present; otherwise OpenRouter is selected when `OPENROUTER_API_KEY` exists. `JEWTER_API_KEY` overrides the credential for the selected transport. If using it with OpenRouter, explicitly choose `transport: "openrouter"` or set `JEWTER_TRANSPORT=openrouter`.
+To enter a TypeSafe key manually, open `/jewter` → **Advanced** → **TypeSafe API key**. Use the default **global** scope to keep it outside your repository. The key is stored as plain text in `jewter.json` (menu writes use owner-only file permissions); the menu shows only whether a key is saved and never prefills the existing key. Input itself is plain text. Submit an empty value to remove the saved key; Esc cancels. Environment credentials take precedence: `JEWTER_API_KEY` → `TYPESAFE_API_KEY` → saved `jev.typesafeApiKey`.
+
+The OpenRouter decisions endpoint is alpha. Under `auto`, TypeSafe is preferred when a saved key, `TYPESAFE_API_KEY` or `JEWTER_API_KEY` is present; otherwise OpenRouter is selected when `OPENROUTER_API_KEY` exists. `JEWTER_API_KEY` overrides the credential for the selected transport. If using it with OpenRouter, explicitly choose `transport: "openrouter"` or set `JEWTER_TRANSPORT=openrouter`.
 
 | `jev` field | Default | Range / behavior |
 | --- | --- | --- |
 | `transport` | `auto` | `auto`, `typesafe`, `openrouter` |
+| `typesafeApiKey` | Unset | Saved TypeSafe credential; environment keys take precedence; never used for OpenRouter |
 | `model` | Transport default | Override classifier model ID, not the answering model |
 | `baseUrl` | Transport default | Override classifier endpoint; use a trusted endpoint |
 | `timeoutMs` | `8000` | 500–120000 ms per Jev request |
@@ -115,7 +118,7 @@ If `fastMax > strongMin`, normalization lowers `fastMax` to `strongMin` and emit
 | `JEWTER_DISABLED` | Boolean inverse of top-level `enabled` |
 | `JEWTER_NOTIFY` | Override `ui.notify`: `main`, `all`, `off` |
 
-Boolean-like values accept `true/false`, `1/0`, `yes/no`, `on/off`. Store credentials in the environment, not in `jewter.json`. These variables do not replace physical model authentication.
+Boolean-like values accept `true/false`, `1/0`, `yes/no`, `on/off`. Prefer environment credentials if you do not want a plain-text key in `jewter.json`. Never commit saved keys. These variables do not replace physical model authentication.
 
 ## Routing switches
 
