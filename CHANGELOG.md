@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.3.3]
+
 - Added step-by-step model routing, enabled by default: Jev uses bounded recent assistant actions and tool results to choose the model for the next response. Select per-request routing in `/jewter` → **Routing**; retries and direct calls still keep their fallback model.
 - Added a configurable cache-switch confidence penalty (`routing.cachePenalty`, default `0.15`) to discourage marginal mid-request model switches, with visible keep reasons in the decision trail.
 
