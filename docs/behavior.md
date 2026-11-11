@@ -8,17 +8,18 @@
 
 ## Routing
 
-The virtual router classifies **user requests**, not every tool continuation:
+By default (`routing.mode: "step"`), the virtual router classifies **each agent-loop step**, including continuations after tools. Select `request` to classify only new user requests.
 
-1. Send Jev the current prompt, current role when known, and a bounded previous exchange to resolve follow-ups.
+1. Send Jev the current prompt, current role when known, and a bounded previous exchange to resolve follow-ups. On continuations in step mode, include bounded recent assistant actions and tool results; ask for the role and capability needed for the **next response**, not the entire original task.
 2. Ask for a role choice and a complexity score. Complexity describes required knowledge, judgement, ambiguity and risk, not file count.
 3. Reject missing, unknown, `none`, or low-confidence roles. Keep the previous physical model when possible.
 4. Normalize complexity using Jev's advertised numeric legend when available. Confident scores map to `fast`/`medium`/`strong` using the configured thresholds.
 5. If complexity is uncertain, use a level with probability at least `tierMajority`; otherwise use `medium` for the accepted role. Footer notes distinguish majority selection from default fallback.
 6. Resolve model and thinking independently from role overrides and global tiers. A matching role/tier still re-resolves physical settings, so config changes can take effect.
-7. If the selected physical model is unavailable, retain the previous model. On an initial request without a previous model, try configured tiers in order `medium`, `fast`, `strong` for the fallback role. If none is available, fail with a configuration error.
+7. Before a mid-request physical switch, apply `routing.cachePenalty`: require both role and complexity confidence ≥ `min(1, jev.minConfidence + cachePenalty)` and a confident complexity score. Otherwise keep the previous model/state with a `cache-penalty` receipt. Zero disables this heuristic. Same-model thinking changes and new user requests are not penalized.
+8. If the selected physical model is unavailable, retain the previous model. On an initial request without a previous model, try configured tiers in order `medium`, `fast`, `strong` for the fallback role. If none is available, fail with a configuration error.
 
-Jev errors normally keep the prior model. Cancellation is propagated. Failed attempts/retries and non-user continuations stay on the prior physical model rather than being reclassified. The router does not automatically promote a failed task to a stronger model.
+Jev errors normally keep the prior model. Cancellation is propagated. Retries keep the failed model (or previous/fallback when absent), and direct calls bypass classification. Continuations are reclassified only in step mode. The router does not automatically promote a failed task to a stronger model.
 
 `jewter/<role>` supplies a fallback role; it does not constrain Jev to that role. Select a physical model directly for a fixed choice. Changing providers/models can lose prompt-cache benefits; no cache-preservation or cost-optimality guarantee is made.
 
@@ -29,8 +30,9 @@ Jev errors normally keep the prior model. Cancellation is propagated. Failed att
 - Previous user text: at most 500 characters.
 - Previous assistant text: at most 1,500 characters (head and tail if longer).
 - Configured role descriptions and the classification questions.
+- In step-mode continuations only: the last eight messages since the latest user prompt, capped at 8,000 characters total (head and tail). Assistant text is capped at 1,500 characters per block, tool-call arguments at 1,000, and tool-result text at 2,000 per message. Thinking blocks, images and system messages are excluded. Excerpts are treated as untrusted evidence, not instructions.
 
-Routing does not send tool output or full history. A complex follow-up can lose crucial context at these bounds; ask a more explicit question or choose a model manually. `/jewter route` previews the supplied text without the conversation excerpt or an applied model switch.
+Request mode does not send tool output; neither mode sends full history. A complex follow-up can lose crucial context at these bounds; ask a more explicit question or choose a model manually. `/jewter route` previews the supplied text without the conversation excerpt or an applied model switch.
 
 ## Verification hints
 

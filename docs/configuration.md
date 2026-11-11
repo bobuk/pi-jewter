@@ -125,8 +125,18 @@ Boolean-like values accept `true/false`, `1/0`, `yes/no`, `on/off`. Prefer envir
 | Field | Default | Effect |
 | --- | --- | --- |
 | `enabled` | `true` | Routing and verification hints toggle; compaction remains independent |
+| `routing.mode` | `"step"` | `step`: classify each user request and tool/extension continuation; `request`: classify only new user requests. Retries and direct calls retain their fallback model in both modes |
+| `routing.cachePenalty` | `0.15` | Extra role **and complexity** confidence required for a mid-request physical model switch; threshold is `min(1, jev.minConfidence + cachePenalty)`. Requires a confident complexity score, not a majority/default tier. Range 0–1; 0 disables the penalty |
 | `routing.keepSameRole` | `true` | Marks a matching current role **and tier** as unchanged; physical model/thinking are still re-resolved against current config |
-| `routing.sticky` | `true` | Present in config; currently not consulted by the virtual router. Continuations/retries keep the prior model regardless of this value |
+| `routing.sticky` | `true` | Legacy, ignored; use `routing.mode` instead |
+
+Choose **`/jewter` → Routing → Choose model** to change mode, and **Cache switch penalty** to tune the penalty. Settings can be saved globally or for a trusted project. Existing configs without `routing.mode` now use `step`, even if they contain the legacy `sticky` field.
+
+```json
+"routing": { "mode": "step", "cachePenalty": 0.15 }
+```
+
+The penalty is confidence-based hysteresis, **not a monetary cost estimate**. With default confidence 0.6, switching mid-request requires both confidences ≥ 0.75. Same-physical-model thinking changes and new user requests are not penalized. A rejected switch keeps the previous role/tier/model and records `cache-penalty` in the decision trail. Classification still runs every step; it adds latency and sends bounded tool excerpts to Jev. Switching can still lose cache, and provider cache reuse is not guaranteed.
 
 `/jewter on|off` writes the global `enabled` value; trusted-project config and environment can still override it. Turning routing off does not disable the virtual model: it keeps the prior physical model or uses a configured fallback.
 

@@ -17,8 +17,9 @@ test("user request classifies and routes to role tier", async () => {
   const route=createRoute({getContext:()=>ctx,getConfig:()=>config,observe:r=>records.push(r),classify:async()=>{calls++;return {response:answer,transport:"fake"};}});
   const selected=await route(req("user")); assert.equal(selected.model.id,"strong"); assert.equal(selected.state?.role,"planning"); assert.equal(records[0]?.status,"switch"); assert.equal(calls,1);
 });
-test("continuation and retry stick without classifier", async () => {
-  let calls=0; const route=createRoute({getContext:()=>ctx,getConfig:()=>config,observe:()=>{},classify:async()=>{calls++;return {response:answer,transport:"fake"};}});
+test("request mode continuations stick without classifier", async () => {
+  const requestConfig = structuredClone(config); requestConfig.routing.mode = "request";
+  let calls=0; const route=createRoute({getContext:()=>ctx,getConfig:()=>requestConfig,observe:()=>{},classify:async()=>{calls++;return {response:answer,transport:"fake"};}});
   const selected=await route(req("continuation",{previous:{model:fast,thinkingLevel:"low"}})); assert.equal(selected.model.id,"fast");assert.equal(selected.thinkingLevel,"low");assert.equal(calls,0);
 });
 test("classifier failure keeps previous, first turn uses configured fallback", async () => {

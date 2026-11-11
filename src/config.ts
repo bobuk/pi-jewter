@@ -60,8 +60,15 @@ export interface JevConfig {
   enabled: boolean;
 }
 
+export const ROUTING_MODES = ["request", "step"] as const;
+export type RoutingMode = (typeof ROUTING_MODES)[number];
+
 export interface RoutingConfig {
-  /** Keep the current model for continuation/retry requests of the same turn. */
+  /** Classify each user request, or each agent-loop step (not retries/direct calls). */
+  mode: RoutingMode;
+  /** Extra confidence required to switch physical models on a continuation, in 0..1. */
+  cachePenalty: number;
+  /** Legacy setting, retained for config compatibility; use mode instead. */
   sticky: boolean;
   /** Keep the current model when the classified role equals the current one. */
   keepSameRole: boolean;
@@ -191,6 +198,8 @@ export function defaultConfig(): JewterConfig {
       enabled: true,
     },
     routing: {
+      mode: "step",
+      cachePenalty: 0.15,
       sticky: true,
       keepSameRole: true,
     },
@@ -364,6 +373,10 @@ export function normalizeConfig(raw: unknown, base: JewterConfig = defaultConfig
 
   if (isPlainObject(raw.routing)) {
     const routing = raw.routing;
+    if (typeof routing.mode === "string" && (ROUTING_MODES as readonly string[]).includes(routing.mode)) {
+      config.routing.mode = routing.mode as RoutingMode;
+    }
+    config.routing.cachePenalty = clampNumber(asNumber(routing.cachePenalty, config.routing.cachePenalty), 0, 1);
     config.routing.sticky = asBoolean(routing.sticky, config.routing.sticky);
     config.routing.keepSameRole = asBoolean(routing.keepSameRole, config.routing.keepSameRole);
   }

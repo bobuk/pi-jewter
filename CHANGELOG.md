@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Added step-by-step model routing, enabled by default: Jev uses bounded recent assistant actions and tool results to choose the model for the next response. Select per-request routing in `/jewter` → **Routing**; retries and direct calls still keep their fallback model.
+- Added a configurable cache-switch confidence penalty (`routing.cachePenalty`, default `0.15`) to discourage marginal mid-request model switches, with visible keep reasons in the decision trail.
+
 ## [0.3.2]
 
 - Added manual TypeSafe API key entry, replacement and removal in `/jewter` → **Advanced**, with environment credential precedence and a warning before saving a key in project scope.

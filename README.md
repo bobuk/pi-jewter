@@ -4,7 +4,7 @@
 
 🎯 **Use the right model for each task without switching models by hand.** Small questions rarely need your most expensive model; architecture and difficult debugging often do. Jewter is a [Pi](https://pi.dev) extension that chooses among your configured models as the conversation moves between different kinds of work.
 
-🔀 **Select `jewter/auto` once.** For each new request, Jewter uses the [Jev](https://typesafe.ai) classifier to identify the task and the model capability it needs, then selects a model and thinking level from your settings. Planning, implementation, review and verification can each use different combinations.
+🔀 **Select `jewter/auto` once.** By default, before each agent step (including after tool results), Jewter uses the [Jev](https://typesafe.ai) classifier to identify the task and the model capability it needs, then selects a model and thinking level from your settings. Planning, implementation, review and verification can each use different combinations. A cache-switch penalty discourages marginal model changes; choose per-request routing instead in `/jewter` → **Routing**.
 
 🧭 **You stay in control.** You choose the models and routing settings, can see what actually answered, and can switch back to a specific model at any time. Jewter does not automatically delegate work, run tests or enforce a development workflow.
 

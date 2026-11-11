@@ -19,6 +19,7 @@ export function setupDialogPrompt(cwd: string): string {
     "- compaction = { enabled, model, thinking, minConfidence, minReduction, retainedChars, maxSummaryChars }",
     "- subagents.agents.<agent> = \"auto\" | \"off\" | \"<role>\"",
     "- jev = { transport: \"auto|typesafe|openrouter\", model, baseUrl, minConfidence, fastMax, strongMin, tierMajority, timeoutMs }",
+    "- routing = { mode: \"request|step\", cachePenalty: 0..1 } (default: step, 0.15; penalty adds confidence required to switch models after tools, not a monetary estimate)",
     "- ui = { notify: \"main|all|off\", footer, cards, report }",
     "- verify = { enabled, minConfidence } (Jev-gated hint to verify a run that changed files; never sent automatically)",
     "",

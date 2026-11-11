@@ -36,6 +36,32 @@ export function previousExchange(messages: readonly Message[]): string | undefin
   return parts.length ? parts.join("\n\n") : undefined;
 }
 
+/** Bounded evidence since the latest user message; never send thinking or image bytes. */
+export function stepContext(messages: readonly Message[]): string {
+  const lastUser = messages.findLastIndex(m => m.role === "user");
+  const parts = messages.slice(lastUser + 1).slice(-8).flatMap(message => {
+    if (message.role === "assistant") {
+      return message.content.flatMap(block => {
+        if (block.type === "text") return [`Assistant: ${bounded(block.text, 1500)}`];
+        if (block.type === "toolCall") return [`Tool call ${block.name}: ${bounded(JSON.stringify(block.arguments), 1000)}`];
+        return [];
+      });
+    }
+    if (message.role === "toolResult") {
+      const text = message.content.flatMap(block => block.type === "text" ? [block.text] : []).join("\n");
+      return [`Tool result ${message.toolName}${message.isError ? " (error)" : ""}: ${bounded(text, 2000)}`];
+    }
+    return [];
+  });
+  return bounded(parts.join("\n\n"), 8000);
+}
+
+function bounded(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const head = Math.floor((max - 5) / 2);
+  return `${text.slice(0, head)}\n[…]\n${text.slice(-(max - head - 5))}`.slice(0, max);
+}
+
 /** Match an exact physical model in the authenticated registry, never another virtual router. */
 export function findPhysical(ctx: ExtensionContext, ref: string | undefined): Model<Api> | undefined {
   if (!ref) return;
@@ -46,14 +72,14 @@ export interface RouterDeps {
   getContext: () => ExtensionContext | undefined;
   getConfig: (ctx: ExtensionContext) => JewterConfig;
   observe: Observer;
-  classify?: (config: JewterConfig, prompt: string, role: string | undefined, signal?: AbortSignal, previous?: string) => Promise<{ response: Awaited<ReturnType<JevClient["ask"]>>; transport: string; classifierModel?: string }>;
+  classify?: (config: JewterConfig, prompt: string, role: string | undefined, signal?: AbortSignal, previous?: string, step?: string) => Promise<{ response: Awaited<ReturnType<JevClient["ask"]>>; transport: string; classifierModel?: string }>;
 }
 
-export async function classify(config: JewterConfig, prompt: string, role?: string, signal?: AbortSignal, previous?: string) {
+export async function classify(config: JewterConfig, prompt: string, role?: string, signal?: AbortSignal, previous?: string, step?: string) {
   const resolved = resolveTransport(config.jev, process.env);
   if (!resolved.ok) throw new Error(resolved.error);
   const client = new JevClient({ transport: resolved.transport, timeoutMs: config.jev.timeoutMs });
-  const response = await client.ask(buildJevState(prompt, role, previous), buildJevQuestions(config), signal);
+  const response = await client.ask(buildJevState(prompt, role, previous, step), buildJevQuestions(config), signal);
   return { response, transport: resolved.transport.id, classifierModel: response.model ?? resolved.transport.model };
 }
 
@@ -75,7 +101,8 @@ export function createRoute(deps: RouterDeps, defaultRole?: string) {
     if (!ctx) throw new Error("Jewter: session context is not initialized");
     const config = deps.getConfig(ctx);
     const role = request.state?.role ?? defaultRole ?? "quick";
-    if (request.reason !== "user") return fallback(ctx, config, role, request);
+    const isStep = request.reason === "continuation" && config.routing.mode === "step";
+    if (request.reason !== "user" && !isStep) return fallback(ctx, config, role, request);
     const start = Date.now();
     const previous = request.previous;
     const previousModel = previous && `${previous.model.provider}/${previous.model.id}`;
@@ -95,7 +122,7 @@ export function createRoute(deps: RouterDeps, defaultRole?: string) {
     };
     if (!config.enabled || !config.jev.enabled) return keep("disabled");
     try {
-      const result = await (deps.classify ?? classify)(config, lastUserText(request.messages), request.state?.role, request.signal, previousExchange(request.messages));
+      const result = await (deps.classify ?? classify)(config, lastUserText(request.messages), request.state?.role, request.signal, previousExchange(request.messages), isStep ? stepContext(request.messages) : undefined);
       record.transport = result.transport;
       record.classifierModel = result.classifierModel;
       const decision = decide({ response: result.response, config, currentRole: request.state?.role, currentTier: request.state?.tier });
@@ -109,6 +136,14 @@ export function createRoute(deps: RouterDeps, defaultRole?: string) {
       const target = resolveTier(config, decision.role, decision.tier);
       const model = findPhysical(ctx, target.model);
       if (!model) return keep(`unavailable model: ${target.model ?? `${decision.role}/${decision.tier} is unset`}`);
+      // Cache-loss hysteresis is charged only for physical switches inside a user request.
+      // It is a confidence heuristic, not a token-price estimate; same-model thinking changes are free.
+      if (isStep && previous && previousModel !== `${model.provider}/${model.id}` && config.routing.cachePenalty > 0) {
+        const threshold = Math.min(1, config.jev.minConfidence + config.routing.cachePenalty);
+        if (decision.roleConfidence < threshold || decision.scoreConfidence < threshold || decision.tierSource !== "jev") {
+          return keep(`cache-penalty: switch requires role and complexity confidence >= ${threshold.toFixed(2)}`);
+        }
+      }
       const thinkingLevel = clampThinkingLevel(model, target.thinking === "auto" ? request.thinkingLevel : target.thinking);
       record.status = previousModel === `${model.provider}/${model.id}` && previous?.thinkingLevel === thinkingLevel ? "keep" : "switch";
       record.model = `${model.provider}/${model.id}`;

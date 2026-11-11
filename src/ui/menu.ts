@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getAgentDir, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
-import { configPaths, configuredModelRefs, isRoleId, loadConfig, NOTIFY_MODES, resolveTier, THINKING_SETTINGS, TIER_NAMES, TRANSPORTS, type TierName } from "../config.ts";
+import { configPaths, configuredModelRefs, isRoleId, loadConfig, NOTIFY_MODES, ROUTING_MODES, resolveTier, THINKING_SETTINGS, TIER_NAMES, TRANSPORTS, type TierName } from "../config.ts";
 import { scanAgents } from "../subagents/catalog.ts";
 import { writeAgentOverride } from "../subagents/integration.ts";
 import { modelItem, pickWithSearch, sortModelItems, type PickItem, type PickScope } from "./picker.ts";
@@ -229,6 +229,28 @@ export async function menu(ctx: ExtensionCommandContext, refresh: () => void, on
     return n;
   };
 
+  const routingMenu = () => submenu("Routing", () => {
+    const c = config();
+    return [
+      { value: "enabled", label: "Enabled", description: onOff(c.enabled) },
+      { value: "mode", label: "Choose model", description: c.routing.mode === "step" ? "every step · extra Jev calls; switches may lose cache" : "once per user request" },
+      { value: "cachePenalty", label: "Cache switch penalty", description: `+${c.routing.cachePenalty} confidence required for a mid-request model switch` },
+    ];
+  }, async choice => {
+    const c = config();
+    if (choice === "enabled") save(d => { d.enabled = !c.enabled; });
+    else if (choice === "mode") {
+      const mode = await pickWithSearch(ctx, "Choose model", ROUTING_MODES.map(value => ({
+        value, label: value === "step" ? "Every step" : "Each user request",
+        description: value === "step" ? "Reclassify after tool results; cache penalty discourages switching" : "Keep the model through tool continuations",
+      })), { current: c.routing.mode, initial: c.routing.mode });
+      if (mode) save(d => { d.routing ??= {}; d.routing.mode = mode; });
+    } else if (choice === "cachePenalty") {
+      const n = await numberField("Cache switch penalty (extra confidence; 0 disables)", c.routing.cachePenalty, 0, 1);
+      if (n !== undefined) save(d => { d.routing ??= {}; if (n === null) delete d.routing.cachePenalty; else d.routing.cachePenalty = n; });
+    }
+  });
+
   const advancedMenu = () => submenu("Advanced", () => {
     const c = config();
     return [
@@ -294,6 +316,7 @@ export async function menu(ctx: ExtensionCommandContext, refresh: () => void, on
     const items: PickItem[] = [
       { value: DIALOG, label: DIALOG },
       { value: "Models", label: "Models", description: modelsSummary(c) },
+      { value: "Routing", label: "Routing", description: `${onOff(c.enabled)} · ${c.routing.mode === "step" ? "every step" : "each user request"} · cache penalty ${c.routing.cachePenalty}` },
       { value: "Subagents", label: "Subagents", description: `${Object.keys(subagentBindings(readJson(settingsPath()))).length} bound` },
       { value: "Compaction", label: "Compaction", description: compactionSummary(c) },
       { value: "Display", label: "Display", description: displaySummary(c) },
@@ -315,6 +338,7 @@ export async function menu(ctx: ExtensionCommandContext, refresh: () => void, on
     if (choice === DIALOG) { onDialog?.(); return "dialog"; }
     try {
       if (choice === "Models") await modelsMenu();
+      else if (choice === "Routing") await routingMenu();
       else if (choice === "Subagents") await subagentsMenu();
       else if (choice === "Compaction") await compactionMenu();
       else if (choice === "Display") await displayMenu();
