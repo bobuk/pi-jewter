@@ -142,12 +142,12 @@ fit causes a safe refusal before a network call.
 The compaction fallback fits its complete message envelope within the model's
 advertised context, with a base answer budget of up to 2,048 tokens and 1,024
 additional tokens reserved for provider framing. Before fitting input, it reserves
-the effective total output ceiling. Pi 1.5 adds a thinking budget for budget-based
-Anthropic and Bedrock Claude calls. Jewter uses the installed SDK's
-`adjustMaxTokensForThinking` helper to reserve that sum, limited by the model's
-output maximum. For example, `high` with a 2,048 base budget and a 16,384 model
+the model's full output maximum for budget-based Anthropic and Bedrock Claude
+reasoning calls. This conservative local reserve covers additive thinking without
+importing private SDK helpers or copying their level-specific formulas. For
+example, any enabled thinking level with a 2,048 base budget and a 16,384 model
 output maximum reserves 16,384 tokens. Adaptive Anthropic calls retain the base
-ceiling. All Bedrock reasoning calls use the conservative additive reserve,
+ceiling. All Bedrock reasoning calls use the full output maximum,
 including adaptive models. Other APIs retain the base ceiling.
 Configured thinking is preserved. If its output reserve and fixed input overhead
 cannot fit, Jewter refuses the fallback and lets Pi compact; it does not silently

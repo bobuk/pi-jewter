@@ -1,6 +1,5 @@
 import { ContextError, contextRecorder, fitViews, isContextError } from "../service/context.ts";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
-import { adjustMaxTokensForThinking } from "@earendil-works/pi-ai/api/simple-options";
 import { clampThinkingLevel, type Api, type Model, type ThinkingLevel } from "@earendil-works/pi-ai";
 import { buildSessionProjection, type ExtensionAPI, type ExtensionContext, type SessionEntry } from "@earendil-works/pi-coding-agent";
 import { JevClient, resolveTransport } from "../jev/client.ts";
@@ -12,18 +11,18 @@ import type { ServiceCall } from "../report/summary.ts";
 /** Total characters of result excerpts sent to the fallback LLM in one request. */
 const LLM_EXCERPT_BUDGET = 60_000;
 
-/** Reserve the SDK's total response ceiling, including additive thinking budgets. */
+/** Conservative output reserve without depending on private SDK helpers. */
 export function fallbackOutputBudget(model: Model<Api>, thinking: ThinkingLevel | "off") {
   const modelMax = model.maxTokens ?? 2048;
   const maxTokens = Math.min(2048, modelMax);
-  // Pi 1.5 adds thinking to maxTokens for budget-based Anthropic and Bedrock
-  // Claude. Reserve the same helper's ceiling. All Bedrock reasoning models
-  // use this conservative reserve, including adaptive models that add nothing.
+  // Pi adds thinking to maxTokens for budget-based Anthropic and Bedrock
+  // Claude. Reserve the full model output cap rather than copy SDK formulas.
+  // Include adaptive Bedrock models conservatively, even when they add nothing.
   if (thinking === "off") return { maxTokens, reservedTokens: maxTokens };
   const adaptive = model.compat && "forceAdaptiveThinking" in model.compat && model.compat.forceAdaptiveThinking === true;
   const additive = (model.api === "anthropic-messages" && !adaptive) || model.api === "bedrock-converse-stream";
   const reservedTokens = additive
-    ? adjustMaxTokensForThinking(maxTokens, modelMax, thinking).maxTokens
+    ? modelMax
     : maxTokens;
   return { maxTokens, reservedTokens };
 }

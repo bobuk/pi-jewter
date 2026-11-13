@@ -11,6 +11,23 @@
 
 A new role can require `/reload` before it appears in model selection. Project settings only apply in a trusted project.
 
+### Offline loader regression check (source checkout)
+
+After `npm ci --ignore-scripts`, `npm run check` includes a smoke test using Pi's
+public `DefaultResourceLoader`. This catches runtime import resolution failures
+that direct Node imports can miss. To test a specific installed Pi release:
+
+```sh
+PI_LOADER_ENTRY=/path/to/pi-coding-agent/dist/index.js node --experimental-strip-types --test test/extension-loader.test.ts
+```
+
+Use the installed package's absolute `dist/index.js` path. The test loads this
+checkout's `src/index.ts`, checks command and compaction-hook registration, and
+uses a temporary agent directory with in-memory settings. It blocks fetch calls,
+makes no model calls, and does not change installed extensions or global settings.
+An error containing `pi-ai-extension-view.js/api/simple-options` identifies the
+old private-helper import problem; use the fixed source and rerun this check.
+
 ## “No previous model and no available fallback”
 
 The router cannot answer by itself. Configure an authenticated physical model in default `medium`, preferably all three tiers. Check exact IDs with `pi --list-models` and working credentials through Pi's normal model setup. Catalog presence alone is not a successful authentication test.

@@ -58,7 +58,7 @@ test("Jev recognizes long HTTP and thrown context errors without retaining provi
   assert.ok(isContextError({ error: { message: "prompt is too long" } }));
 });
 
-for (const mode of ["success", "thrown", "returned", "tiny", "thinking", "thinking-tiny"] as const) {
+for (const mode of ["success", "thrown", "returned", "tiny", "thinking", "thinking-tiny", "thinking-low-tiny"] as const) {
   test(`compaction persists context failures and uses safe fallback: ${mode}`, async () => {
     let handler: Function | undefined;
     const entries: { type: string; data: unknown }[] = [];
@@ -66,9 +66,10 @@ for (const mode of ["success", "thrown", "returned", "tiny", "thinking", "thinki
     const config = defaultConfig();
     Object.assign(config.compaction, { enabled: true, minResultChars: 400, retainedChars: 100, minReduction: 0.01 });
     config.tiers.fast.model = "openrouter/fast";
-    const thinking = mode === "thinking" || mode === "thinking-tiny";
-    if (thinking) config.compaction.thinking = "high";
-    const window = mode === "tiny" ? 1000 : mode === "thinking-tiny" ? 16000 : thinking ? 24000 : 8192;
+    const thinking = mode.startsWith("thinking");
+    if (thinking) config.compaction.thinking = mode === "thinking-low-tiny" ? "low" : "high";
+    const refuses = mode === "tiny" || mode === "thinking-tiny" || mode === "thinking-low-tiny";
+    const window = mode === "tiny" ? 1000 : refuses ? 16000 : thinking ? 24000 : 8192;
     registerCompaction(pi, () => config);
     const originalFetch = globalThis.fetch;
     const oldKey = process.env.TYPESAFE_API_KEY;
@@ -96,7 +97,7 @@ for (const mode of ["success", "thrown", "returned", "tiny", "thinking", "thinki
     try {
       const result = await handler!(event, ctx);
       assert.equal(jevCalls, 1);
-      assert.equal(llmCalls, mode === "tiny" || mode === "thinking-tiny" ? 0 : 1);
+      assert.equal(llmCalls, refuses ? 0 : 1);
       assert.ok(entries.some(e => e.type === CONTEXT_ENTRY && JSON.stringify(e.data).includes('"service":"jev"') && JSON.stringify(e.data).includes("provider-overflow")));
       if (mode === "success" || mode === "thinking") {
         assert.ok(result.compaction.summary.includes("Keep this original goal"));
