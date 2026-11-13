@@ -1,3 +1,4 @@
+import { isContextError } from "../service/context.ts";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { Usage } from "@earendil-works/pi-ai";
 import type { CompactionConfig } from "../config.ts";
@@ -187,6 +188,7 @@ export async function compact(span: Span, config: CompactionConfig, deps: Depend
     }),
   };
 
+  const reduced = new Set<string>();
   const answers: Record<string, unknown> = {};
   let jevRequests = 0;
   const jevTokens = { input: 0, output: 0 };
@@ -200,11 +202,18 @@ export async function compact(span: Span, config: CompactionConfig, deps: Depend
         criteria: { keep: "Retain the entire result", shorten: "Keep only its beginning and end; the middle is unnecessary and recoverable" },
       };
     }
-    const result = await deps.askJev(state, questions, signal);
-    Object.assign(answers, result.answers);
-    jevRequests++;
-    jevTokens.input += result.usage?.input_tokens ?? 0;
-    jevTokens.output += result.usage?.output_tokens ?? 0;
+    try {
+      jevRequests++;
+      const result = await deps.askJev({ ...state, results: state.results.filter(r => r.id in questions) }, questions, signal);
+      Object.assign(answers, result.answers);
+      if (result.contextReduced) for (const id of Object.keys(questions)) reduced.add(id);
+      jevTokens.input += result.usage?.input_tokens ?? 0;
+      jevTokens.output += result.usage?.output_tokens ?? 0;
+    } catch (error) {
+      if (signal?.aborted || !isContextError(error)) throw error;
+      // Stop Jev calls. Missing answers go to the single bounded LLM fallback.
+      break;
+    }
   }
 
   const chosen = new Map<string, "keep" | "shorten">();
@@ -214,7 +223,7 @@ export async function compact(span: Span, config: CompactionConfig, deps: Depend
   for (const c of candidates) {
     const verdict = choice(answers[c.id], config.minConfidence);
     if (verdict === "keep") chosen.set(c.id, "keep");
-    else if (verdict === "shorten" && views.get(c.id)!.complete) chosen.set(c.id, "shorten");
+    else if (verdict === "shorten" && views.get(c.id)!.complete && !reduced.has(c.id)) chosen.set(c.id, "shorten");
     else {
       // Uncertain, missing, or a shorten based on a partial view: a second opinion is required.
       if (verdict === "shorten") verify++; else uncertain++;

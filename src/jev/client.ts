@@ -1,3 +1,4 @@
+import { ContextError, fitViews, isContextError, JEV_REQUEST_BYTES, type ContextDiagnostic } from "../service/context.ts";
 import type { EnvLike, JevConfig, Transport } from "../config.ts";
 import { JEV_TRANSPORTS, type JevQuestions, type JevResponse } from "./types.ts";
 
@@ -59,17 +60,20 @@ export class JevError extends Error {
 export interface JevClientOptions {
   transport: ResolvedTransport;
   timeoutMs: number;
+  diagnostic?: (service: ContextDiagnostic["service"], event: ContextDiagnostic["event"]) => void;
   /** Injectable fetch for tests. */
   fetch?: typeof fetch;
 }
 
 /** Minimal HTTP client for the System One `{model, state, questions}` protocol. */
 export class JevClient {
+  private readonly diagnostic: JevClientOptions["diagnostic"];
   private readonly transport: ResolvedTransport;
   private readonly timeoutMs: number;
   private readonly fetcher: typeof fetch;
 
   constructor(options: JevClientOptions) {
+    this.diagnostic = options.diagnostic;
     this.transport = options.transport;
     this.timeoutMs = options.timeoutMs;
     this.fetcher = options.fetch ?? fetch;
@@ -84,46 +88,67 @@ export class JevClient {
     questions: JevQuestions,
     signal?: AbortSignal,
   ): Promise<JevResponse> {
+    signal?.throwIfAborted();
+    let fitted;
+    try {
+      fitted = fitViews(state, view => JSON.stringify({ model: this.transport.model, state: view, questions }), JEV_REQUEST_BYTES);
+    } catch (error) {
+      if (isContextError(error)) this.diagnostic?.("jev", "fixed-overhead");
+      throw error;
+    }
+    if (fitted.reduced) this.diagnostic?.("jev", "reduced");
     const timeout = AbortSignal.timeout(this.timeoutMs);
     const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
-    let response: Response;
     try {
-      response = await this.fetcher(this.transport.baseUrl, {
+      const response = await this.fetcher(this.transport.baseUrl, {
         method: "POST",
         headers: {
           authorization: `Bearer ${this.transport.apiKey}`,
           "content-type": "application/json",
         },
-        body: JSON.stringify({ model: this.transport.model, state, questions }),
+        body: fitted.body,
         signal: combined,
       });
+      combined.throwIfAborted();
+      const text = await response.text();
+      combined.throwIfAborted();
+      if (response.status === 413 || (!response.ok && isContextError(text))) {
+        throw new ContextError("provider-overflow");
+      }
+      if (!response.ok) {
+        throw new JevError(`Jev request failed (${response.status}): provider error`, {
+          status: response.status,
+        });
+      }
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        throw new JevError("Jev returned malformed JSON");
+      }
+      if (parsed && typeof parsed === "object" && "error" in parsed && isContextError(parsed.error)) {
+        throw new ContextError("provider-overflow");
+      }
+      if (
+        parsed === null ||
+        typeof parsed !== "object" ||
+        !("answers" in parsed) ||
+        parsed.answers === null ||
+        typeof parsed.answers !== "object"
+      ) {
+        throw new JevError("Jev response is missing answers");
+      }
+      return { ...parsed as JevResponse, contextReduced: fitted.reduced };
     } catch (error) {
-      throw new JevError(
-        `Jev request failed (${this.transport.label}): ${error instanceof Error ? error.message : String(error)}`,
-      );
+      // Cancellation wins over provider classification, including late body failures.
+      combined.throwIfAborted();
+      if (isContextError(error)) {
+        this.diagnostic?.("jev", "provider-overflow");
+        throw new ContextError("provider-overflow");
+      }
+      if (error instanceof JevError) throw error;
+      throw new JevError(`Jev request failed (${this.transport.label}): network or timeout error`);
     }
-    const text = await response.text();
-    if (!response.ok) {
-      throw new JevError(`Jev request failed (${response.status}): ${text.slice(0, 200)}`, {
-        status: response.status,
-      });
-    }
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      throw new JevError("Jev returned malformed JSON");
-    }
-    if (
-      parsed === null ||
-      typeof parsed !== "object" ||
-      !("answers" in parsed) ||
-      parsed.answers === null ||
-      typeof parsed.answers !== "object"
-    ) {
-      throw new JevError("Jev response is missing answers");
-    }
-    return parsed as JevResponse;
   }
 }
 

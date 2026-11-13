@@ -1,3 +1,4 @@
+import { contextRecorder, isContextError } from "../service/context.ts";
 import { Text } from "@earendil-works/pi-tui";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { JewterConfig } from "../config.ts";
@@ -18,10 +19,10 @@ export interface VerifyEntry {
 
 type Ask = (config: JewterConfig, state: Record<string, unknown>, questions: JevQuestions) => Promise<JevResponse>;
 
-const askJev: Ask = async (config, state, questions) => {
+const askJev = async (config: JewterConfig, state: Record<string, unknown>, questions: JevQuestions, diagnostic?: ReturnType<typeof contextRecorder>, signal?: AbortSignal) => {
   const resolved = resolveTransport(config.jev, process.env);
   if (!resolved.ok) throw new Error(resolved.error);
-  return new JevClient({ transport: resolved.transport, timeoutMs: config.jev.timeoutMs }).ask(state, questions);
+  return new JevClient({ transport: resolved.transport, timeoutMs: config.jev.timeoutMs, diagnostic }).ask(state, questions, signal);
 };
 
 function textOf(message: unknown): string {
@@ -35,7 +36,7 @@ function textOf(message: unknown): string {
  * worth suggesting. A confident `suggest` places a ready prompt in an empty editor;
  * it is never sent automatically.
  */
-export function registerVerify(pi: ExtensionAPI, getConfig: (ctx: ExtensionContext) => JewterConfig, ask: Ask = askJev) {
+export function registerVerify(pi: ExtensionAPI, getConfig: (ctx: ExtensionContext) => JewterConfig, ask?: Ask) {
   let facts: RunFacts | undefined;
   const pending = new Map<string, { name: string; path?: string; command?: string; mutatingCommand: boolean }>();
   let run = 0;
@@ -100,16 +101,19 @@ export function registerVerify(pi: ExtensionAPI, getConfig: (ctx: ExtensionConte
     const gate = { enabled: config.verify.enabled, routingEnabled: config.enabled && config.jev.enabled, child: isChild(ctx), hasUI: ctx.hasUI };
     if (!shouldAsk(current, gate)) return;
     const mine = run;
+    const recordContext = contextRecorder(pi, "verification");
+    const diagnostic: ReturnType<typeof contextRecorder> = (service, event) => { if (mine === run) recordContext(service, event); };
     // Do not hold up the settled run on a network call.
     inflight = (async () => {
       try {
-        const decision = decideVerify(await ask(config, buildVerifyState(current), buildVerifyQuestions()), config.verify.minConfidence);
+        const decision = decideVerify(await (ask ? ask(config, buildVerifyState(current), buildVerifyQuestions()) : askJev(config, buildVerifyState(current), buildVerifyQuestions(), diagnostic, ctx.signal)), config.verify.minConfidence);
         if (!decision.suggest || mine !== run) return; // A newer request makes the hint stale.
         const prompt = suggestionPrompt(current);
         const inserted = ctx.ui.getEditorText().trim() === "";
         if (inserted) ctx.ui.setEditorText(prompt);
         pi.appendEntry<VerifyEntry>(VERIFY_ENTRY, { prompt, confidence: decision.confidence, inserted });
-      } catch {
+      } catch (error) {
+        if (ask && isContextError(error)) diagnostic("jev", "provider-overflow");
         // A failed hint is not worth interrupting the user; routing reports Jev errors already.
       }
     })();

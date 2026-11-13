@@ -128,3 +128,43 @@ Paths, command arguments, prompt text and tool output can contain secrets or sen
 Jev latency/cost is separate from physical model use and is not currently included in Pi's session cost totals. Compaction fallback LLM usage is attached when Pi accepts custom compaction. If the custom result is rejected and Pi compaction takes over, those spent fallback calls are not added to session totals; the skip notification can report them. The receipt is not a complete billing ledger, especially for calls in other extensions.
 
 Confidence is a model-supplied signal, not a calibrated probability that the result is correct. Small live evaluation fixtures validate examples, not production reliability or security.
+
+### Service context budgets
+
+Jewter fits the full serialized Jev request, including the model and all questions,
+within a 24,000 UTF-8 byte operational budget. This is a conservative local
+estimate, not a tokenizer measurement or a guarantee about a provider's context
+limit. JSON escaping and Unicode bytes count toward the budget. Only classifier
+views of conversation evidence can shrink. Criteria, question instructions,
+schemas, model names and result IDs remain intact. Fixed overhead that cannot
+fit causes a safe refusal before a network call.
+
+The compaction fallback fits its complete message envelope within the model's
+advertised context, with a base answer budget of up to 2,048 tokens and 1,024
+additional tokens reserved for provider framing. Before fitting input, it reserves
+the effective total output ceiling. Pi 1.5 adds a thinking budget for budget-based
+Anthropic and Bedrock Claude calls. Jewter uses the installed SDK's
+`adjustMaxTokensForThinking` helper to reserve that sum, limited by the model's
+output maximum. For example, `high` with a 2,048 base budget and a 16,384 model
+output maximum reserves 16,384 tokens. Adaptive Anthropic calls retain the base
+ceiling. All Bedrock reasoning calls use the conservative additive reserve,
+including adaptive models. Other APIs retain the base ceiling.
+Configured thinking is preserved. If its output reserve and fixed input overhead
+cannot fit, Jewter refuses the fallback and lets Pi compact; it does not silently
+lower thinking. SDK context clamps can reduce actual output further.
+It estimates input tokens using serialized UTF-8 bytes. Missing model metadata
+uses an 8,192 context estimate and a 2,048 model output maximum. These are
+estimates; a provider can still reject the request. There are no context retries.
+A Jev context failure stops further Jev batches and sends unresolved results to
+one fitted fallback request. Unresolved results stay intact. If selective
+compaction cannot safely reduce the context, Pi's normal compaction runs.
+The original conversation and tool evidence are never changed by request fitting.
+
+Local `jewter-service-context` session entries record only a version, service,
+purpose and fixed event category for view reduction or context failure. These
+entries stay outside model context. They contain no prompts, credentials or raw
+provider error text. Context failures remain recorded even when fallback succeeds.
+
+Jev response reading is protected through body decoding. Context errors become
+fixed local categories. Cancellation and timeout take priority over provider
+error classification and never create a provider-overflow entry.

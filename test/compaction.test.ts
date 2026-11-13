@@ -146,3 +146,15 @@ test("configuration opt-in and bounds", () => {
   assert.equal(c.retainedChars, 100);
   assert.equal(c.maxSummaryChars, 4000);
 });
+
+
+test("a budget-reduced Jev view requires confirmation even for a formerly complete result", async () => {
+  let called = false;
+  const result = await compact({ messages }, cfg, {
+    askJev: async () => ({ ...response(0.99), contextReduced: true }),
+    askLlm: async () => { called = true; return { decisions: { r1: "keep" } }; },
+  });
+  assert.equal(called, true);
+  assert.equal(result.ok, false);
+  assert.equal((messages[2] as { content: { text: string }[] }).content[0]?.text, "x".repeat(2000));
+});
