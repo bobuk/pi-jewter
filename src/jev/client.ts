@@ -99,9 +99,8 @@ export class JevClient {
     if (fitted.reduced) this.diagnostic?.("jev", "reduced");
     const timeout = AbortSignal.timeout(this.timeoutMs);
     const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
-    let response: Response;
     try {
-      response = await this.fetcher(this.transport.baseUrl, {
+      const response = await this.fetcher(this.transport.baseUrl, {
         method: "POST",
         headers: {
           authorization: `Bearer ${this.transport.apiKey}`,
@@ -110,43 +109,46 @@ export class JevClient {
         body: fitted.body,
         signal: combined,
       });
+      combined.throwIfAborted();
+      const text = await response.text();
+      combined.throwIfAborted();
+      if (response.status === 413 || (!response.ok && isContextError(text))) {
+        throw new ContextError("provider-overflow");
+      }
+      if (!response.ok) {
+        throw new JevError(`Jev request failed (${response.status}): provider error`, {
+          status: response.status,
+        });
+      }
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        throw new JevError("Jev returned malformed JSON");
+      }
+      if (parsed && typeof parsed === "object" && "error" in parsed && isContextError(parsed.error)) {
+        throw new ContextError("provider-overflow");
+      }
+      if (
+        parsed === null ||
+        typeof parsed !== "object" ||
+        !("answers" in parsed) ||
+        parsed.answers === null ||
+        typeof parsed.answers !== "object"
+      ) {
+        throw new JevError("Jev response is missing answers");
+      }
+      return { ...parsed as JevResponse, contextReduced: fitted.reduced };
     } catch (error) {
-      if (signal?.aborted) throw error;
-      if (isContextError(error)) { this.diagnostic?.("jev", "provider-overflow"); throw new ContextError("provider-overflow"); }
-      throw new JevError(
-        `Jev request failed (${this.transport.label}): network or timeout error`,
-      );
+      // Cancellation wins over provider classification, including late body failures.
+      combined.throwIfAborted();
+      if (isContextError(error)) {
+        this.diagnostic?.("jev", "provider-overflow");
+        throw new ContextError("provider-overflow");
+      }
+      if (error instanceof JevError) throw error;
+      throw new JevError(`Jev request failed (${this.transport.label}): network or timeout error`);
     }
-    const text = await response.text();
-    if (response.status === 413 || (!response.ok && isContextError(text))) {
-      this.diagnostic?.("jev", "provider-overflow");
-      throw new ContextError("provider-overflow");
-    }
-    if (!response.ok) {
-      throw new JevError(`Jev request failed (${response.status}): provider error`, {
-        status: response.status,
-      });
-    }
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      throw new JevError("Jev returned malformed JSON");
-    }
-    if (parsed && typeof parsed === "object" && "error" in parsed && isContextError(parsed.error)) {
-      this.diagnostic?.("jev", "provider-overflow");
-      throw new ContextError("provider-overflow");
-    }
-    if (
-      parsed === null ||
-      typeof parsed !== "object" ||
-      !("answers" in parsed) ||
-      parsed.answers === null ||
-      typeof parsed.answers !== "object"
-    ) {
-      throw new JevError("Jev response is missing answers");
-    }
-    return { ...parsed as JevResponse, contextReduced: fitted.reduced };
   }
 }
 

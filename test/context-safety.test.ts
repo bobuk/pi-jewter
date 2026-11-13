@@ -58,7 +58,7 @@ test("Jev recognizes long HTTP and thrown context errors without retaining provi
   assert.ok(isContextError({ error: { message: "prompt is too long" } }));
 });
 
-for (const mode of ["success", "thrown", "returned", "tiny"] as const) {
+for (const mode of ["success", "thrown", "returned", "tiny", "thinking", "thinking-tiny"] as const) {
   test(`compaction persists context failures and uses safe fallback: ${mode}`, async () => {
     let handler: Function | undefined;
     const entries: { type: string; data: unknown }[] = [];
@@ -66,6 +66,9 @@ for (const mode of ["success", "thrown", "returned", "tiny"] as const) {
     const config = defaultConfig();
     Object.assign(config.compaction, { enabled: true, minResultChars: 400, retainedChars: 100, minReduction: 0.01 });
     config.tiers.fast.model = "openrouter/fast";
+    const thinking = mode === "thinking" || mode === "thinking-tiny";
+    if (thinking) config.compaction.thinking = "high";
+    const window = mode === "tiny" ? 1000 : mode === "thinking-tiny" ? 16000 : thinking ? 24000 : 8192;
     registerCompaction(pi, () => config);
     const originalFetch = globalThis.fetch;
     const oldKey = process.env.TYPESAFE_API_KEY;
@@ -75,10 +78,11 @@ for (const mode of ["success", "thrown", "returned", "tiny"] as const) {
     let llmCalls = 0;
     const notices: string[] = [];
     const ctx = { hasUI: false, ui: { notify: (text: string) => notices.push(text) }, modelRegistry: {
-      getAvailable: () => [{ provider: "openrouter", id: "fast", api: "openai-completions", reasoning: false, contextWindow: mode === "tiny" ? 1000 : 8192, maxTokens: 2048 }],
-      streamSimple: (_model: unknown, context: unknown, options: { maxTokens: number }) => {
+      getAvailable: () => [{ provider: "openrouter", id: "fast", api: thinking ? "anthropic-messages" : "openai-completions", reasoning: thinking, contextWindow: window, maxTokens: thinking ? 16384 : 2048 }],
+      streamSimple: (_model: unknown, context: unknown, options: { maxTokens: number; reasoning?: string }) => {
         llmCalls++;
-        assert.ok(Buffer.byteLength(JSON.stringify(context)) + options.maxTokens + 1024 <= 8192);
+        assert.ok(Buffer.byteLength(JSON.stringify(context)) + (thinking ? 16384 : options.maxTokens) + 1024 <= window);
+        if (thinking) assert.equal(options.reasoning, "high");
         if (mode === "thrown") throw new Error("private ".repeat(1000) + "maximum context length exceeded");
         return { result: async () => mode === "returned" ? { stopReason: "error", errorMessage: "private ".repeat(1000) + "context_length_exceeded" } : { stopReason: "stop", content: [{ type: "text", text: '{"r1":"shorten"}' }] } };
       },
@@ -92,9 +96,9 @@ for (const mode of ["success", "thrown", "returned", "tiny"] as const) {
     try {
       const result = await handler!(event, ctx);
       assert.equal(jevCalls, 1);
-      assert.equal(llmCalls, mode === "tiny" ? 0 : 1);
+      assert.equal(llmCalls, mode === "tiny" || mode === "thinking-tiny" ? 0 : 1);
       assert.ok(entries.some(e => e.type === CONTEXT_ENTRY && JSON.stringify(e.data).includes('"service":"jev"') && JSON.stringify(e.data).includes("provider-overflow")));
-      if (mode === "success") {
+      if (mode === "success" || mode === "thinking") {
         assert.ok(result.compaction.summary.includes("Keep this original goal"));
         assert.ok(result.compaction.summary.includes("original-id"));
       } else {
@@ -166,4 +170,38 @@ test("verification fixed overhead refusal remains silent and keeps the editor", 
   await verify.idle();
   assert.equal(editor, "draft");
   assert.deepEqual(entries, [{ version: 1, service: "jev", purpose: "verification", event: "fixed-overhead" }]);
+});
+
+
+test("Jev sanitizes context failures thrown while reading response bodies", async () => {
+  const events: string[] = [];
+  const response = new Response("", { status: 200 });
+  Object.defineProperty(response, "text", { value: async () => { throw new Error("private ".repeat(1000) + "context_length_exceeded"); } });
+  await assert.rejects(client(async () => response, events).ask({}, questions), error => error instanceof ContextError && !error.message.includes("private"));
+  assert.deepEqual(events, ["jev:provider-overflow"]);
+});
+
+for (const body of ["thrown", "http", "json", "success"] as const) {
+  test(`Jev late cancellation wins over body ${body} without context diagnostics`, async () => {
+    const controller = new AbortController();
+    const events: string[] = [];
+    const response = new Response("", { status: body === "http" ? 413 : 200 });
+    Object.defineProperty(response, "text", { value: async () => {
+      controller.abort();
+      if (body === "thrown") throw new Error("private context_length_exceeded");
+      if (body === "http") return "private context length exceeded";
+      if (body === "json") return '{"error":{"message":"private context length exceeded"}}';
+      return '{"answers":{}}';
+    } });
+    await assert.rejects(client(async () => response, events).ask({}, questions, controller.signal), error => error === controller.signal.reason);
+    assert.deepEqual(events, []);
+  });
+}
+
+test("Jev body network errors are sanitized without a false context diagnostic", async () => {
+  const events: string[] = [];
+  const response = new Response("");
+  Object.defineProperty(response, "text", { value: async () => { throw new Error("private body failure"); } });
+  await assert.rejects(client(async () => response, events).ask({}, questions), error => error instanceof Error && /network or timeout/.test(error.message) && !error.message.includes("private"));
+  assert.deepEqual(events, []);
 });
