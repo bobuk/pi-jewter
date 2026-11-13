@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.3.5]
+
+- fix(compaction): avoid private SDK import in Pi loader
+
 ## [0.3.4]
 
 - Reserve SDK thinking output and guard Jev response reads
