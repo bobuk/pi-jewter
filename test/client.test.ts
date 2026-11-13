@@ -143,6 +143,6 @@ test("JevClient surfaces fetch failures", async () => {
   const client = new JevClient({ transport: resolved.transport, timeoutMs: 1000, fetch: fetchStub });
   await assert.rejects(
     () => client.ask({}, { role: { type: "choice", instructions: "pick", criteria: {} } }),
-    (error: unknown) => error instanceof JevError && /network down/.test(error.message),
+    (error: unknown) => error instanceof JevError && /network or timeout error/.test(error.message),
   );
 });

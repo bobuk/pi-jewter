@@ -1,3 +1,4 @@
+import { contextRecorder } from "../service/context.ts";
 import { clampThinkingLevel, type Message, type Model, type Api } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext, ModelRoute, ModelRouteRequest } from "@earendil-works/pi-coding-agent";
 import { resolveTier, type JewterConfig, type TierName } from "../config.ts";
@@ -72,13 +73,14 @@ export interface RouterDeps {
   getContext: () => ExtensionContext | undefined;
   getConfig: (ctx: ExtensionContext) => JewterConfig;
   observe: Observer;
+  diagnostic?: ReturnType<typeof contextRecorder>;
   classify?: (config: JewterConfig, prompt: string, role: string | undefined, signal?: AbortSignal, previous?: string, step?: string) => Promise<{ response: Awaited<ReturnType<JevClient["ask"]>>; transport: string; classifierModel?: string }>;
 }
 
-export async function classify(config: JewterConfig, prompt: string, role?: string, signal?: AbortSignal, previous?: string, step?: string) {
+export async function classify(config: JewterConfig, prompt: string, role?: string, signal?: AbortSignal, previous?: string, step?: string, diagnostic?: ReturnType<typeof contextRecorder>) {
   const resolved = resolveTransport(config.jev, process.env);
   if (!resolved.ok) throw new Error(resolved.error);
-  const client = new JevClient({ transport: resolved.transport, timeoutMs: config.jev.timeoutMs });
+  const client = new JevClient({ transport: resolved.transport, timeoutMs: config.jev.timeoutMs, diagnostic });
   const response = await client.ask(buildJevState(prompt, role, previous, step), buildJevQuestions(config), signal);
   return { response, transport: resolved.transport.id, classifierModel: response.model ?? resolved.transport.model };
 }
@@ -122,7 +124,8 @@ export function createRoute(deps: RouterDeps, defaultRole?: string) {
     };
     if (!config.enabled || !config.jev.enabled) return keep("disabled");
     try {
-      const result = await (deps.classify ?? classify)(config, lastUserText(request.messages), request.state?.role, request.signal, previousExchange(request.messages), isStep ? stepContext(request.messages) : undefined);
+      const args: Parameters<NonNullable<RouterDeps["classify"]>> = [config, lastUserText(request.messages), request.state?.role, request.signal, previousExchange(request.messages), isStep ? stepContext(request.messages) : undefined];
+      const result = await (deps.classify ? deps.classify(...args) : classify(...args, deps.diagnostic));
       record.transport = result.transport;
       record.classifierModel = result.classifierModel;
       const decision = decide({ response: result.response, config, currentRole: request.state?.role, currentTier: request.state?.tier });
@@ -168,7 +171,7 @@ export function registerRouters(pi: ExtensionAPI, deps: RouterDeps) {
     for (const id of registered) if (!ids.has(id)) { pi.unregisterVirtualModel("jewter", id); registered.delete(id); }
     for (const id of ids) {
       if (registered.has(id)) continue;
-      pi.registerVirtualModel<RouterState>({ provider: "jewter", id, name: `Jewter ${id}`, thinkingLevels: [...LEVELS], route: createRoute(deps, id === "auto" ? undefined : id) });
+      pi.registerVirtualModel<RouterState>({ provider: "jewter", id, name: `Jewter ${id}`, thinkingLevels: [...LEVELS], route: createRoute({ ...deps, diagnostic: contextRecorder(pi, "routing") }, id === "auto" ? undefined : id) });
       registered.add(id);
     }
   };

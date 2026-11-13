@@ -1,3 +1,4 @@
+import { ContextError, fitViews, isContextError, JEV_REQUEST_BYTES, type ContextDiagnostic } from "../service/context.ts";
 import type { EnvLike, JevConfig, Transport } from "../config.ts";
 import { JEV_TRANSPORTS, type JevQuestions, type JevResponse } from "./types.ts";
 
@@ -59,17 +60,20 @@ export class JevError extends Error {
 export interface JevClientOptions {
   transport: ResolvedTransport;
   timeoutMs: number;
+  diagnostic?: (service: ContextDiagnostic["service"], event: ContextDiagnostic["event"]) => void;
   /** Injectable fetch for tests. */
   fetch?: typeof fetch;
 }
 
 /** Minimal HTTP client for the System One `{model, state, questions}` protocol. */
 export class JevClient {
+  private readonly diagnostic: JevClientOptions["diagnostic"];
   private readonly transport: ResolvedTransport;
   private readonly timeoutMs: number;
   private readonly fetcher: typeof fetch;
 
   constructor(options: JevClientOptions) {
+    this.diagnostic = options.diagnostic;
     this.transport = options.transport;
     this.timeoutMs = options.timeoutMs;
     this.fetcher = options.fetch ?? fetch;
@@ -84,6 +88,15 @@ export class JevClient {
     questions: JevQuestions,
     signal?: AbortSignal,
   ): Promise<JevResponse> {
+    signal?.throwIfAborted();
+    let fitted;
+    try {
+      fitted = fitViews(state, view => JSON.stringify({ model: this.transport.model, state: view, questions }), JEV_REQUEST_BYTES);
+    } catch (error) {
+      if (isContextError(error)) this.diagnostic?.("jev", "fixed-overhead");
+      throw error;
+    }
+    if (fitted.reduced) this.diagnostic?.("jev", "reduced");
     const timeout = AbortSignal.timeout(this.timeoutMs);
     const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
     let response: Response;
@@ -94,17 +107,23 @@ export class JevClient {
           authorization: `Bearer ${this.transport.apiKey}`,
           "content-type": "application/json",
         },
-        body: JSON.stringify({ model: this.transport.model, state, questions }),
+        body: fitted.body,
         signal: combined,
       });
     } catch (error) {
+      if (signal?.aborted) throw error;
+      if (isContextError(error)) { this.diagnostic?.("jev", "provider-overflow"); throw new ContextError("provider-overflow"); }
       throw new JevError(
-        `Jev request failed (${this.transport.label}): ${error instanceof Error ? error.message : String(error)}`,
+        `Jev request failed (${this.transport.label}): network or timeout error`,
       );
     }
     const text = await response.text();
+    if (response.status === 413 || (!response.ok && isContextError(text))) {
+      this.diagnostic?.("jev", "provider-overflow");
+      throw new ContextError("provider-overflow");
+    }
     if (!response.ok) {
-      throw new JevError(`Jev request failed (${response.status}): ${text.slice(0, 200)}`, {
+      throw new JevError(`Jev request failed (${response.status}): provider error`, {
         status: response.status,
       });
     }
@@ -113,6 +132,10 @@ export class JevClient {
       parsed = JSON.parse(text);
     } catch {
       throw new JevError("Jev returned malformed JSON");
+    }
+    if (parsed && typeof parsed === "object" && "error" in parsed && isContextError(parsed.error)) {
+      this.diagnostic?.("jev", "provider-overflow");
+      throw new ContextError("provider-overflow");
     }
     if (
       parsed === null ||
@@ -123,7 +146,7 @@ export class JevClient {
     ) {
       throw new JevError("Jev response is missing answers");
     }
-    return parsed as JevResponse;
+    return { ...parsed as JevResponse, contextReduced: fitted.reduced };
   }
 }
 
