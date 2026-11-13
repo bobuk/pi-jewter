@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.3.4]
+
+- Reserve SDK thinking output and guard Jev response reads
+- Bound service context requests and preserve safe fallback diagnostics
+
 ## [0.3.3]
 
 - Added step-by-step model routing, enabled by default: Jev uses bounded recent assistant actions and tool results to choose the model for the next response. Select per-request routing in `/jewter` → **Routing**; retries and direct calls still keep their fallback model.
