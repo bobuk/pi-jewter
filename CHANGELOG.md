@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.3.6]
+
 - Added configurable `jev.maxResponseBytes` (default `256000`, `JEWTER_JEV_MAX_RESPONSE_BYTES`, and `/jewter` → **Advanced**) to bound Jev HTTP response bodies during streaming.
 - `/jewter` → **Subagents** → `off` now cleanly removes an existing Jewter binding and child-only extension entry from Pi settings while preserving unrelated overrides.
 - `/jewter on` and `/jewter off` now support optional `[global|project]` scope and warn when `.pi/jewter.json`, `JEWTER_DISABLED`, or `jev.enabled` overrides the effective routing state.
