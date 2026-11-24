@@ -35,6 +35,8 @@ export TYPESAFE_API_KEY='…'
 export OPENROUTER_API_KEY='…'
 ```
 
+For TypeSafe, you can also enter the key inside Pi via `/jewter` → **Advanced** → **TypeSafe API key** (saved in global `jewter.json` by default; environment variables take precedence).
+
 This key is for classification, **separate from your answering models**. Claude or ChatGPT subscription sign-ins do not authenticate Jev.
 
 ### 3. Choose your models
@@ -61,6 +63,7 @@ Use `/model` to select **`jewter/auto`**, then ask as usual. Select a specific m
 | `/jewter route <text>` | Preview a route without switching models |
 | `/jewter verify` | Put the latest verification suggestion in the editor; does not send it |
 | `/jewter on` / `/jewter off` | Enable or disable routing globally |
+| `/psst <question>` | Ask a read-only Jev-routed side question outside the main transcript (`/psst inject`, `clear`, `abort`) |
 
 Settings normally live in `~/.pi/agent/jewter.json`; trusted projects can override them in `.pi/jewter.json`. See the [configuration reference](docs/configuration.md) for all settings and commands.
 

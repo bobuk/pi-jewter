@@ -1,0 +1,53 @@
+name: Bug report
+description: Report a bug or unexpected routing, verification, compaction, or UI behavior
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please remove API keys, credentials, sensitive file paths, command arguments, and private prompt or tool output before submitting.
+        For security vulnerabilities, use [private reporting](https://github.com/bobuk/pi-jewter/security/advisories/new) instead.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the bug clearly, including expected vs. actual behavior.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Select `jewter/auto`
+        2. Run ...
+        3. Observe ...
+    validations:
+      required: true
+
+  - type: input
+    id: versions
+    attributes:
+      label: Versions & install source
+      description: Pi version, Node version, and pi-jewter version/source (npm or git).
+      placeholder: "Pi 1.6.0, Node 22.19.0, npm:pi-jewter@0.3.5"
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Sanitized `/jewter why` output or relevant config
+      description: Include subagent execution mode if relevant. Redact secrets and private content.
+      render: text
+
+  - type: checkboxes
+    id: sanitized
+    attributes:
+      label: Privacy check
+      options:
+        - label: I removed API keys, credentials, and sensitive prompt/tool content from this report.
+          required: true

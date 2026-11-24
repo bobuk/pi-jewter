@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Added open source repository health templates: `SECURITY.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, issue templates, and PR template.
+- Documented `/psst` command and in-app TypeSafe API key configuration in `README.md`.
+- Ignored `.pi/` and `.selecta/` directories in `.gitignore` to prevent committing local keys or workspace state.
+
 ## [0.3.5]
 
 - fix(compaction): avoid private SDK import in Pi loader

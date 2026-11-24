@@ -1,0 +1,26 @@
+name: Feature request
+description: Suggest an improvement or new capability for pi-jewter
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or motivation
+      description: What workflow or limitation does this address?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: How should it work from a user's perspective?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives or context
+      description: Any workarounds, trade-offs, or related issues.
