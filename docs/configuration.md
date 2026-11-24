@@ -97,6 +97,7 @@ The OpenRouter decisions endpoint is alpha. Under `auto`, TypeSafe is preferred 
 | `model` | Transport default | Override classifier model ID, not the answering model |
 | `baseUrl` | Transport default | Override classifier endpoint; use a trusted endpoint |
 | `timeoutMs` | `8000` | 500–120000 ms per Jev request |
+| `maxResponseBytes` | `256000` | 1024–10000000 UTF-8 bytes accepted for a Jev HTTP response body |
 | `minConfidence` | `0.6` | 0–1; role confidence gate, also used for complexity confidence |
 | `fastMax` | `0.34` | 0–1; normalized complexity ≤ this selects `fast` |
 | `strongMin` | `0.67` | 0–1; normalized complexity ≥ this selects `strong` |
@@ -115,6 +116,7 @@ If `fastMax > strongMin`, normalization lowers `fastMax` to `strongMin` and emit
 | `JEWTER_TRANSPORT` | Override `jev.transport` |
 | `JEWTER_JEV_MODEL` | Override `jev.model` |
 | `JEWTER_JEV_BASE_URL` | Override `jev.baseUrl` |
+| `JEWTER_JEV_MAX_RESPONSE_BYTES` | Override `jev.maxResponseBytes` (1024–10000000) |
 | `JEWTER_DISABLED` | Boolean inverse of top-level `enabled` |
 | `JEWTER_NOTIFY` | Override `ui.notify`: `main`, `all`, `off` |
 
@@ -138,7 +140,7 @@ Choose **`/jewter` → Routing → Choose model** to change mode, and **Cache sw
 
 The penalty is confidence-based hysteresis, **not a monetary cost estimate**. With default confidence 0.6, switching mid-request requires both confidences ≥ 0.75. Same-physical-model thinking changes and new user requests are not penalized. A rejected switch keeps the previous role/tier/model and records `cache-penalty` in the decision trail. Classification still runs every step; it adds latency and sends bounded tool excerpts to Jev. Switching can still lose cache, and provider cache reuse is not guaranteed.
 
-`/jewter on|off` writes the global `enabled` value; trusted-project config and environment can still override it. Turning routing off does not disable the virtual model: it keeps the prior physical model or uses a configured fallback.
+`/jewter on|off [global|project]` writes the `enabled` value for the selected scope (`global` by default) and warns if a trusted-project config, `JEWTER_DISABLED`, or `jev.enabled: false` still overrides the effective state. Turning routing off does not disable the virtual model: it keeps the prior physical model or uses a configured fallback.
 
 ## Verification hints
 
@@ -204,6 +206,6 @@ Use `/jewter` → **Subagents** to configure actual `pi-subagents` routing. Afte
 
 The menu inserts the real installed Jewter path, preserves other override fields and merges child-only extensions. If a child uses a custom provider such as `claude-bridge`, ensure its provider extension is loaded in that child too. Paths are machine/install-specific; do not distribute your own absolute paths as a portable preset.
 
-The accepted `jewter.json` field `subagents.agents.<name> = "auto" | "off" | "<role>"` is **not an automatic installer of agent overrides**. Writing it alone does not change child model selection. The menu reads and writes the effective bindings in Pi settings. `off (leave unchanged)` does not undo an existing binding: remove or replace that override in Pi settings yourself.
+The accepted `jewter.json` field `subagents.agents.<name> = "auto" | "off" | "<role>"` is **not an automatic installer of agent overrides**. Writing it alone does not change child model selection. The menu reads and writes the effective bindings in Pi settings. Selecting `off` on a bound agent removes its `jewter/*` model and Jewter child-only extension entry while preserving unrelated overrides.
 
 See [subagent workflow](workflows.md#subagents) for loading policies and limitations.

@@ -146,3 +146,56 @@ test("JevClient surfaces fetch failures", async () => {
     (error: unknown) => error instanceof JevError && /network or timeout error/.test(error.message),
   );
 });
+
+test("JevClient enforces configurable maxResponseBytes on Content-Length and streamed chunks", async () => {
+  const resolved = resolveTransport(jevConfig({ transport: "typesafe" }), { TYPESAFE_API_KEY: "ts" });
+  assert.ok(resolved.ok);
+  const q = { role: { type: "choice" as const, instructions: "pick", criteria: {} } };
+
+  // Declared Content-Length above limit is rejected without reading further.
+  const headerClient = new JevClient({
+    transport: resolved.transport,
+    timeoutMs: 1000,
+    maxResponseBytes: 1024,
+    fetch: async () => new Response('{"answers":{}}', { status: 200, headers: { "content-length": "4096" } }),
+  });
+  await assert.rejects(
+    () => headerClient.ask({}, q),
+    (error: unknown) => error instanceof JevError && /exceeded 1024 bytes/.test(error.message),
+  );
+
+  // Streaming body without Content-Length cancels as soon as accumulated bytes exceed maxResponseBytes.
+  let cancelled = false;
+  let pulls = 0;
+  const stream = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      pulls++;
+      controller.enqueue(new Uint8Array(600).fill(0x61));
+    },
+    cancel() {
+      cancelled = true;
+    },
+  });
+  const streamClient = new JevClient({
+    transport: resolved.transport,
+    timeoutMs: 1000,
+    maxResponseBytes: 1024,
+    fetch: async () => new Response(stream, { status: 200 }),
+  });
+  await assert.rejects(
+    () => streamClient.ask({}, q),
+    (error: unknown) => error instanceof JevError && /exceeded 1024 bytes/.test(error.message),
+  );
+  assert.equal(cancelled, true);
+  assert.ok(pulls <= 3);
+
+  // Within limit succeeds cleanly.
+  const okClient = new JevClient({
+    transport: resolved.transport,
+    timeoutMs: 1000,
+    maxResponseBytes: 1024,
+    fetch: async () => new Response(JSON.stringify({ answers: { role: { choice: "planning", confidence: 0.9 } } }), { status: 200 }),
+  });
+  const ok = await okClient.ask({}, q);
+  assert.ok("answers" in ok);
+});

@@ -57,7 +57,7 @@ Use `/model` for manual physical selection when the route matters more than auto
 
 ## `/jewter off` seems ineffective
 
-It writes the **global** routing toggle. A trusted project setting or `JEWTER_DISABLED` can override it. Selecting a `jewter/*` model still needs a physical fallback even while routing is disabled.
+`/jewter on|off` writes the **global** routing toggle by default (and warns when `.pi/jewter.json`, `JEWTER_DISABLED`, or `jev.enabled: false` overrides it; pass `/jewter off project` to toggle a trusted project's config). Selecting a `jewter/*` model still needs a physical fallback even while routing is disabled.
 
 Compaction has an independent toggle and may still run. `/model` → physical model bypasses Jewter routing, but does not itself disable verification hints or compaction. `ui.notify: off` only suppresses model-switch notifications, not every Jewter UI action.
 
@@ -83,7 +83,7 @@ Named roles are fallbacks, not locks. Jev may switch a child to another role; pe
 
 Use the **Subagents** menu, which writes `agentOverrides` into Pi settings. The similarly named map in `jewter.json` alone does not install overrides. Ensure child-only extensions include Jewter and any provider extension it needs. An absolute path copied from another machine or a removed install is invalid.
 
-Test the actual `pi-subagents` execution mode: foreground/background loading policies differ. `off (leave unchanged)` does not remove an old binding; remove/replace it in Pi settings.
+Test the actual `pi-subagents` execution mode: foreground/background loading policies differ. Choose `off` in `/jewter` → **Subagents** to remove an existing Jewter binding from Pi settings.
 
 ## Compaction falls back to Pi
 

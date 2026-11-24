@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,12 +13,29 @@ import {
 } from "./summary.ts";
 
 export function patchFile(path: string, patch: (data: Record<string, any>) => void): void {
-  const data = existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) as Record<string, any> : {};
+  let data: Record<string, any> = {};
+  if (existsSync(path)) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(readFileSync(path, "utf8"));
+    } catch (error) {
+      throw new Error(`${path}: invalid JSON (${error instanceof Error ? error.message : String(error)})`);
+    }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error(`${path}: expected a JSON object`);
+    }
+    data = parsed as Record<string, any>;
+  }
   patch(data);
   mkdirSync(dirname(path), { recursive: true });
   const temp = `${path}.${randomUUID()}.tmp`;
-  writeFileSync(temp, JSON.stringify(data, null, 2) + "\n", { mode: 0o600, flag: "wx" });
-  renameSync(temp, path);
+  try {
+    writeFileSync(temp, JSON.stringify(data, null, 2) + "\n", { mode: 0o600, flag: "wx" });
+    renameSync(temp, path);
+  } catch (error) {
+    try { unlinkSync(temp); } catch { /* Temp file may not exist or may already be moved. */ }
+    throw error;
+  }
 }
 
 function readJson(path: string): unknown {
@@ -167,13 +184,24 @@ export async function menu(ctx: ExtensionCommandContext, refresh: () => void, on
     const selected = await pickWithSearch(ctx, `Route ${agent} through`, [
       { value: "auto", label: "auto", description: "Jev picks role and tier per task" },
       ...Object.keys(c.roles).map(role => ({ value: role, label: role, description: "fallback role; Jev may still switch" })),
-      { value: "off", label: "off", description: "leave the agent's settings unchanged" },
-    ], { current, initial: current });
-    if (!selected || selected === "off") return;
+      { value: "off", label: "off", description: current ? "remove Jewter routing for this agent" : "leave the agent's settings unchanged" },
+    ], { current: current ?? "off", initial: current ?? "off" });
+    if (!selected) return;
+    const extPath = fileURLToPath(new URL("../index.ts", import.meta.url));
+    if (selected === "off") {
+      if (!current) return;
+      if (scope === "project" && !ctx.isProjectTrusted()) throw new Error("Project is not trusted");
+      const path = settingsPath();
+      if (await ctx.ui.confirm("Update Pi settings?", `${path}\n${agent}: remove jewter/${current} override\nReload Pi to apply.`)) {
+        writeAgentOverride(path, agent, null, extPath);
+        ctx.ui.notify("Removed Jewter binding. Run /reload to apply subagent settings.", "info");
+      }
+      return;
+    }
     if (scope === "project" && !ctx.isProjectTrusted()) throw new Error("Project is not trusted");
     const path = settingsPath();
     if (await ctx.ui.confirm("Update Pi settings?", `${path}\n${agent} → jewter/${selected}\nAdd Jewter as a child-only extension; reload Pi to apply.`)) {
-      writeAgentOverride(path, agent, `jewter/${selected}`, fileURLToPath(new URL("../index.ts", import.meta.url)));
+      writeAgentOverride(path, agent, `jewter/${selected}`, extPath);
       ctx.ui.notify("Saved. Run /reload to apply subagent settings.", "info");
     }
   });
@@ -260,6 +288,7 @@ export async function menu(ctx: ExtensionCommandContext, refresh: () => void, on
       { value: "model", label: "Jev model", description: c.jev.model ?? "default" },
       { value: "baseUrl", label: "Jev endpoint", description: c.jev.baseUrl ?? "default" },
       { value: "timeoutMs", label: "Jev timeout (ms)", description: String(c.jev.timeoutMs) },
+      { value: "maxResponseBytes", label: "Jev max response (bytes)", description: String(c.jev.maxResponseBytes) },
       { value: "minConfidence", label: "Role confidence", description: String(c.jev.minConfidence) },
       { value: "fastMax", label: "Fast threshold", description: String(c.jev.fastMax) },
       { value: "strongMin", label: "Strong threshold", description: String(c.jev.strongMin) },
@@ -301,8 +330,12 @@ export async function menu(ctx: ExtensionCommandContext, refresh: () => void, on
       if (n !== undefined) save(d => { d.compaction ??= {}; if (n === null) delete d.compaction[key]; else d.compaction[key] = n; });
       return;
     }
-    const key = choice as "timeoutMs" | "minConfidence" | "fastMax" | "strongMin" | "tierMajority";
-    const [min, max] = key === "timeoutMs" ? [500, 120000] : key === "tierMajority" ? [0.34, 1] : [0, 1];
+    const key = choice as "timeoutMs" | "maxResponseBytes" | "minConfidence" | "fastMax" | "strongMin" | "tierMajority";
+    const [min, max] = key === "timeoutMs"
+      ? [500, 120000]
+      : key === "maxResponseBytes"
+        ? [1024, 10000000]
+        : key === "tierMajority" ? [0.34, 1] : [0, 1];
     const n = await numberField(key, c.jev[key], min, max);
     if (n === undefined) return;
     if (key === "fastMax" && n !== null && n > c.jev.strongMin) throw new Error(`Fast threshold must not exceed the strong threshold (${c.jev.strongMin})`);

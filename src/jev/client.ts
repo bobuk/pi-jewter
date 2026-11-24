@@ -1,5 +1,5 @@
 import { ContextError, fitViews, isContextError, JEV_REQUEST_BYTES, type ContextDiagnostic } from "../service/context.ts";
-import type { EnvLike, JevConfig, Transport } from "../config.ts";
+import { DEFAULT_JEV_MAX_RESPONSE_BYTES, type EnvLike, type JevConfig, type Transport } from "../config.ts";
 import { JEV_TRANSPORTS, type JevQuestions, type JevResponse } from "./types.ts";
 
 /** A transport ready to be used: credential, endpoint and model resolved. */
@@ -60,9 +60,56 @@ export class JevError extends Error {
 export interface JevClientOptions {
   transport: ResolvedTransport;
   timeoutMs: number;
+  maxResponseBytes?: number;
   diagnostic?: (service: ContextDiagnostic["service"], event: ContextDiagnostic["event"]) => void;
   /** Injectable fetch for tests. */
   fetch?: typeof fetch;
+}
+
+async function readLimitedText(response: Response, maxBytes: number, signal: AbortSignal): Promise<string> {
+  const onOverflow = (): never => {
+    if (response.status === 413) throw new ContextError("provider-overflow");
+    throw new JevError(`Jev response exceeded ${maxBytes} bytes`, { status: response.status });
+  };
+  const declared = response.headers?.get("content-length");
+  if (declared !== null && declared !== undefined && declared.trim() !== "") {
+    const length = Number(declared);
+    if (Number.isFinite(length) && length > maxBytes) {
+      await response.body?.cancel().catch(() => {});
+      return onOverflow();
+    }
+  }
+  if (!response.body || Object.hasOwn(response, "text")) {
+    const text = await response.text();
+    signal.throwIfAborted();
+    if (Buffer.byteLength(text, "utf8") > maxBytes) return onOverflow();
+    return text;
+  }
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  const onAbort = () => { void reader.cancel(signal.reason).catch(() => {}); };
+  signal.addEventListener("abort", onAbort, { once: true });
+  try {
+    while (true) {
+      signal.throwIfAborted();
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) {
+        total += value.byteLength;
+        if (total > maxBytes) {
+          await reader.cancel().catch(() => {});
+          return onOverflow();
+        }
+        chunks.push(value);
+      }
+    }
+  } finally {
+    signal.removeEventListener("abort", onAbort);
+    try { reader.releaseLock(); } catch { /* Ignore release failures after cancel. */ }
+  }
+  signal.throwIfAborted();
+  return Buffer.concat(chunks, total).toString("utf8");
 }
 
 /** Minimal HTTP client for the System One `{model, state, questions}` protocol. */
@@ -70,12 +117,14 @@ export class JevClient {
   private readonly diagnostic: JevClientOptions["diagnostic"];
   private readonly transport: ResolvedTransport;
   private readonly timeoutMs: number;
+  private readonly maxResponseBytes: number;
   private readonly fetcher: typeof fetch;
 
   constructor(options: JevClientOptions) {
     this.diagnostic = options.diagnostic;
     this.transport = options.transport;
     this.timeoutMs = options.timeoutMs;
+    this.maxResponseBytes = options.maxResponseBytes ?? DEFAULT_JEV_MAX_RESPONSE_BYTES;
     this.fetcher = options.fetch ?? fetch;
   }
 
@@ -110,7 +159,7 @@ export class JevClient {
         signal: combined,
       });
       combined.throwIfAborted();
-      const text = await response.text();
+      const text = await readLimitedText(response, this.maxResponseBytes, combined);
       combined.throwIfAborted();
       if (response.status === 413 || (!response.ok && isContextError(text))) {
         throw new ContextError("provider-overflow");

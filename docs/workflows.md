@@ -99,7 +99,7 @@ Suggested bindings, when these agents exist:
 
 These are starting points, not required names or agent installations. `verification` defaults are code/test-oriented; for source audits, define a role whose description and model choices match that work.
 
-Configure bindings in `/jewter` → **Subagents**. `auto` permits free role selection; a named role is a fallback, **not a lock**. Other per-run model overrides take precedence. `off` leaves existing settings unchanged rather than unbinding them.
+Configure bindings in `/jewter` → **Subagents**. `auto` permits free role selection; a named role is a fallback, **not a lock**. Other per-run model overrides take precedence. Selecting `off` on a bound agent removes its Jewter routing override while preserving other agent settings.
 
 Child sessions must load Jewter and any provider extensions they need. `pi-subagents` foreground/background modes have different extension-loading policies. Test the exact mode you plan to use. Verification hints are suppressed in detected child sessions; their own receipts remain separate from the parent's.
 

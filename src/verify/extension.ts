@@ -22,7 +22,7 @@ type Ask = (config: JewterConfig, state: Record<string, unknown>, questions: Jev
 const askJev = async (config: JewterConfig, state: Record<string, unknown>, questions: JevQuestions, diagnostic?: ReturnType<typeof contextRecorder>, signal?: AbortSignal) => {
   const resolved = resolveTransport(config.jev, process.env);
   if (!resolved.ok) throw new Error(resolved.error);
-  return new JevClient({ transport: resolved.transport, timeoutMs: config.jev.timeoutMs, diagnostic }).ask(state, questions, signal);
+  return new JevClient({ transport: resolved.transport, timeoutMs: config.jev.timeoutMs, maxResponseBytes: config.jev.maxResponseBytes, diagnostic }).ask(state, questions, signal);
 };
 
 function textOf(message: unknown): string {

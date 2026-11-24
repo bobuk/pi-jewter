@@ -66,7 +66,7 @@ export function registerCompaction(pi: ExtensionAPI, getConfig: (ctx: ExtensionC
     const transport = resolveTransport(config.jev, process.env);
     if (!transport.ok) { ctx.ui.notify(`Jewter compaction: ${transport.error}; using Pi compaction`, "warning"); return; }
     const diagnostic = contextRecorder(pi, "compaction");
-    const jev = new JevClient({ transport: transport.transport, timeoutMs: config.jev.timeoutMs, diagnostic });
+    const jev = new JevClient({ transport: transport.transport, timeoutMs: config.jev.timeoutMs, maxResponseBytes: config.jev.maxResponseBytes, diagnostic });
     const started = Date.now();
     if (ctx.hasUI) ctx.ui.setStatus("jewter-compaction", "Jev compaction: evaluating…");
     try {

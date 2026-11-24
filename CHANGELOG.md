@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Added configurable `jev.maxResponseBytes` (default `256000`, `JEWTER_JEV_MAX_RESPONSE_BYTES`, and `/jewter` → **Advanced**) to bound Jev HTTP response bodies during streaming.
+- `/jewter` → **Subagents** → `off` now cleanly removes an existing Jewter binding and child-only extension entry from Pi settings while preserving unrelated overrides.
+- `/jewter on` and `/jewter off` now support optional `[global|project]` scope and warn when `.pi/jewter.json`, `JEWTER_DISABLED`, or `jev.enabled` overrides the effective routing state.
+- Hardened `mergeConfig` against prototype-key collisions, made conversational setup provider guidance neutral, and cleaned up temporary files and JSON parse errors during atomic config/settings writes.
 - Added open source repository health templates: `SECURITY.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, issue templates, and PR template.
 - Documented `/psst` command and in-app TypeSafe API key configuration in `README.md`.
 - Ignored `.pi/` and `.selecta/` directories in `.gitignore` to prevent committing local keys or workspace state.

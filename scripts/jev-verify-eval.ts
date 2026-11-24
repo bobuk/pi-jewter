@@ -16,7 +16,7 @@ const fixture = JSON.parse(readFileSync(new URL("../test/fixtures/jev-verify-eva
 const config = loadConfig({ cwd: process.cwd() }).config;
 const resolved = resolveTransport(config.jev, process.env);
 if (!resolved.ok) { console.error(resolved.error); process.exit(1); }
-const client = new JevClient({ transport: resolved.transport, timeoutMs: Math.max(config.jev.timeoutMs, 20_000) });
+const client = new JevClient({ transport: resolved.transport, timeoutMs: Math.max(config.jev.timeoutMs, 20_000), maxResponseBytes: config.jev.maxResponseBytes });
 
 const results = await Promise.all(fixture.cases.map(async c => {
   const facts: RunFacts = { prompt: c.prompt, changedFiles: c.changedFiles, indirectChanges: c.indirectChanges ?? [], indirectEdits: c.indirectEdits ?? 0, edits: c.changedFiles.length, commands: c.commands, tests: c.tests ?? [], toolErrors: 0, finalText: c.finalText, aborted: false };

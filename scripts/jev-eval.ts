@@ -30,7 +30,7 @@ const fixture = JSON.parse(readFileSync(new URL("../test/fixtures/jev-live-eval.
 const config = loadConfig({ cwd: process.cwd() }).config;
 const resolved = resolveTransport(config.jev, process.env);
 if (!resolved.ok) { console.error(resolved.error); process.exit(1); }
-const client = new JevClient({ transport: resolved.transport, timeoutMs: Math.max(config.jev.timeoutMs, 20_000) });
+const client = new JevClient({ transport: resolved.transport, timeoutMs: Math.max(config.jev.timeoutMs, 20_000), maxResponseBytes: config.jev.maxResponseBytes });
 
 function variantConfig(variant: Variant): JewterConfig {
   if (variant === "after") return config;

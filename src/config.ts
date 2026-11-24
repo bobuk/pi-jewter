@@ -39,6 +39,9 @@ export interface RoleConfig {
   tiers?: Partial<Record<TierName, TierConfig>>;
 }
 
+/** Maximum UTF-8 response size accepted from Jev by default. */
+export const DEFAULT_JEV_MAX_RESPONSE_BYTES = 256_000;
+
 export interface JevConfig {
   transport: Transport;
   /** Manually configured TypeSafe credential; environment keys take precedence. */
@@ -48,6 +51,8 @@ export interface JevConfig {
   /** Override the transport's default endpoint. */
   baseUrl?: string;
   timeoutMs: number;
+  /** Maximum UTF-8 byte size accepted for a Jev HTTP response body. */
+  maxResponseBytes: number;
   /** Minimum confidence for a role choice to be acted on. */
   minConfidence: number;
   /** Normalized score <= fastMax routes to `fast`. */
@@ -191,6 +196,7 @@ export function defaultConfig(): JewterConfig {
     jev: {
       transport: "auto",
       timeoutMs: 8000,
+      maxResponseBytes: DEFAULT_JEV_MAX_RESPONSE_BYTES,
       minConfidence: 0.6,
       fastMax: 0.34,
       strongMin: 0.67,
@@ -215,17 +221,24 @@ export function defaultConfig(): JewterConfig {
   };
 }
 
+const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
 }
 
 /** Deep-merge plain objects; later scalars win, arrays and null replace. */
 export function mergeConfig<T>(base: T, patch: unknown): T {
   if (patch === undefined) return base;
-  if (patch === null || !isPlainObject(base) || !isPlainObject(patch)) return patch as T;
-  const result: Record<string, unknown> = { ...base };
+  if (patch === null || !isPlainObject(patch)) return patch as T;
+  const result: Record<string, unknown> = isPlainObject(base) ? { ...base } : {};
   for (const [key, value] of Object.entries(patch)) {
-    result[key] = key in result ? mergeConfig((base as Record<string, unknown>)[key], value) : value;
+    if (UNSAFE_KEYS.has(key)) continue;
+    result[key] = Object.hasOwn(result, key)
+      ? mergeConfig(result[key], value)
+      : isPlainObject(value) ? mergeConfig({}, value) : value;
   }
   return result as T;
 }
@@ -358,6 +371,9 @@ export function normalizeConfig(raw: unknown, base: JewterConfig = defaultConfig
     const baseUrl = asString(jev.baseUrl);
     if (baseUrl) config.jev.baseUrl = baseUrl;
     config.jev.timeoutMs = clampNumber(asNumber(jev.timeoutMs, config.jev.timeoutMs), 500, 120_000);
+    config.jev.maxResponseBytes = Math.round(
+      clampNumber(asNumber(jev.maxResponseBytes, config.jev.maxResponseBytes), 1024, 10_000_000),
+    );
     config.jev.minConfidence = clampNumber(asNumber(jev.minConfidence, config.jev.minConfidence), 0, 1);
     config.jev.fastMax = clampNumber(asNumber(jev.fastMax, config.jev.fastMax), 0, 1);
     config.jev.strongMin = clampNumber(asNumber(jev.strongMin, config.jev.strongMin), 0, 1);
@@ -415,6 +431,12 @@ export function applyEnv(config: JewterConfig, env: EnvLike): JewterConfig {
   }
   if (env.JEWTER_JEV_MODEL) next.jev.model = env.JEWTER_JEV_MODEL;
   if (env.JEWTER_JEV_BASE_URL) next.jev.baseUrl = env.JEWTER_JEV_BASE_URL;
+  if (env.JEWTER_JEV_MAX_RESPONSE_BYTES !== undefined && env.JEWTER_JEV_MAX_RESPONSE_BYTES.trim() !== "") {
+    const parsed = Number(env.JEWTER_JEV_MAX_RESPONSE_BYTES);
+    if (Number.isFinite(parsed)) {
+      next.jev.maxResponseBytes = Math.round(clampNumber(parsed, 1024, 10_000_000));
+    }
+  }
   if (env.JEWTER_NOTIFY && (NOTIFY_MODES as readonly string[]).includes(env.JEWTER_NOTIFY)) {
     next.ui.notify = env.JEWTER_NOTIFY as NotifyMode;
   }

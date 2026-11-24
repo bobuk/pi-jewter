@@ -165,6 +165,4 @@ purpose and fixed event category for view reduction or context failure. These
 entries stay outside model context. They contain no prompts, credentials or raw
 provider error text. Context failures remain recorded even when fallback succeeds.
 
-Jev response reading is protected through body decoding. Context errors become
-fixed local categories. Cancellation and timeout take priority over provider
-error classification and never create a provider-overflow entry.
+Jev response reading is protected through body decoding and bounded by `jev.maxResponseBytes` (default 256,000 bytes). Context errors become fixed local categories. Cancellation and timeout take priority over provider error classification and never create a provider-overflow entry.

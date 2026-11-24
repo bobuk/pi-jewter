@@ -80,7 +80,7 @@ export interface RouterDeps {
 export async function classify(config: JewterConfig, prompt: string, role?: string, signal?: AbortSignal, previous?: string, step?: string, diagnostic?: ReturnType<typeof contextRecorder>) {
   const resolved = resolveTransport(config.jev, process.env);
   if (!resolved.ok) throw new Error(resolved.error);
-  const client = new JevClient({ transport: resolved.transport, timeoutMs: config.jev.timeoutMs, diagnostic });
+  const client = new JevClient({ transport: resolved.transport, timeoutMs: config.jev.timeoutMs, maxResponseBytes: config.jev.maxResponseBytes, diagnostic });
   const response = await client.ask(buildJevState(prompt, role, previous, step), buildJevQuestions(config), signal);
   return { response, transport: resolved.transport.id, classifierModel: response.model ?? resolved.transport.model };
 }
